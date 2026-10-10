@@ -22,6 +22,11 @@ spec:
       maxSurge: 1
       maxUnavailable: 0
   template:
+    metadata:
+      labels:
+        # Opt in to metrics scraping: Prometheus scrapes every pod with this label on its
+        # port `http`, path /metrics (platform/monitoring/podmonitor.yaml).
+        idp.surya-idp/metrics: "true"
     spec:
       terminationGracePeriodSeconds: 40   # preStop 20s + graceful shutdown
       priorityClassName: business-critical
@@ -47,6 +52,17 @@ spec:
             matchLabels: {}
       containers:
         - name: app
+          env:
+            # Where to send traces (Tempo, platform/argocd-apps/monitoring-traces.yaml). The
+            # skeleton turns tracing on only when this is set, so the same image runs
+            # unchanged on a laptop.
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://tempo.monitoring.svc:4318
+            # The name traces are filed under: the service label of the pod.
+            - name: OTEL_SERVICE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['app.kubernetes.io/name']
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

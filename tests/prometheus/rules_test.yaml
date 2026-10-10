@@ -1,0 +1,122 @@
+# promtool unit tests for platform/monitoring/rules.yaml. Run by scripts/rules-test.sh (part
+# of validate.sh). Each alert is shown firing on bad data AND staying quiet on good data.
+# `rules.yaml` here is the group list extracted from the PrometheusRule by the script.
+rule_files:
+  - rules.yaml
+evaluation_interval: 1m
+
+tests:
+  # ---- a healthy service: nothing fires -------------------------------------------------
+  - interval: 1m
+    input_series:
+      - series: 'up{job="monitoring/idp-services", namespace="shop", service="shop", pod="shop-1"}'
+        values: '1x20'
+      - series: 'http_requests_total{namespace="shop", service="shop", status="200"}'
+        values: '0+600x20'          # 10 requests/s, all fine
+      - series: 'http_requests_total{namespace="shop", service="shop", status="500"}'
+        values: '0+6x20'            # 1% errors: under the 5% threshold
+      - series: 'http_request_duration_seconds_bucket{namespace="shop", service="shop", le="0.1"}'
+        values: '0+600x20'          # every request under 100 ms
+      - series: 'http_request_duration_seconds_bucket{namespace="shop", service="shop", le="0.5"}'
+        values: '0+606x20'
+      - series: 'http_request_duration_seconds_bucket{namespace="shop", service="shop", le="+Inf"}'
+        values: '0+606x20'
+      - series: 'kube_pod_container_status_restarts_total{namespace="shop", pod="shop-1", container="app"}'
+        values: '0x20'
+    alert_rule_test:
+      - {eval_time: 15m, alertname: ServiceDown, exp_alerts: []}
+      - {eval_time: 15m, alertname: HighErrorRate, exp_alerts: []}
+      - {eval_time: 15m, alertname: HighLatency, exp_alerts: []}
+      - {eval_time: 15m, alertname: PodRestarting, exp_alerts: []}
+
+  # ---- every pod of the service fails its scrape -----------------------------------------
+  - interval: 1m
+    input_series:
+      - series: 'up{job="monitoring/idp-services", namespace="shop", service="shop", pod="shop-1"}'
+        values: '1 1 0x10'
+      - series: 'up{job="monitoring/idp-services", namespace="shop", service="shop", pod="shop-2"}'
+        values: '1 1 0x10'
+    alert_rule_test:
+      - {eval_time: 3m, alertname: ServiceDown, exp_alerts: []}        # down, but not yet for 2 minutes
+      - eval_time: 5m
+        alertname: ServiceDown
+        exp_alerts:
+          - exp_labels: {severity: critical, namespace: shop, service: shop}
+            exp_annotations:
+              summary: "shop has no scrapeable pods"
+              description: "No pod of shop in shop answered /metrics for 2 minutes."
+
+  # ---- one pod down, one up: the service still serves, no alert --------------------------
+  - interval: 1m
+    input_series:
+      - series: 'up{job="monitoring/idp-services", namespace="shop", service="shop", pod="shop-1"}'
+        values: '0x10'
+      - series: 'up{job="monitoring/idp-services", namespace="shop", service="shop", pod="shop-2"}'
+        values: '1x10'
+    alert_rule_test:
+      - {eval_time: 8m, alertname: ServiceDown, exp_alerts: []}
+
+  # ---- 20% of responses are 5xx ----------------------------------------------------------
+  - interval: 1m
+    input_series:
+      - series: 'http_requests_total{namespace="shop", service="shop", status="200"}'
+        values: '0+480x20'
+      - series: 'http_requests_total{namespace="shop", service="shop", status="500"}'
+        values: '0+120x20'
+    alert_rule_test:
+      - {eval_time: 3m, alertname: HighErrorRate, exp_alerts: []}      # not yet for 5 minutes
+      - eval_time: 12m
+        alertname: HighErrorRate
+        exp_alerts:
+          - exp_labels: {severity: critical, namespace: shop, service: shop}
+            exp_annotations:
+              summary: "shop is failing 20% of requests"
+              description: "More than 5% of requests to shop returned 5xx for 5 minutes."
+
+  # ---- 4xx are the caller's fault: no alert, however many ---------------------------------
+  - interval: 1m
+    input_series:
+      - series: 'http_requests_total{namespace="shop", service="shop", status="200"}'
+        values: '0+100x20'
+      - series: 'http_requests_total{namespace="shop", service="shop", status="404"}'
+        values: '0+500x20'
+    alert_rule_test:
+      - {eval_time: 12m, alertname: HighErrorRate, exp_alerts: []}
+
+  # ---- slow: half the requests take longer than 1 s ---------------------------------------
+  - interval: 1m
+    input_series:
+      - series: 'http_request_duration_seconds_bucket{namespace="shop", service="shop", le="0.1"}'
+        values: '0+300x20'
+      - series: 'http_request_duration_seconds_bucket{namespace="shop", service="shop", le="0.5"}'
+        values: '0+300x20'
+      - series: 'http_request_duration_seconds_bucket{namespace="shop", service="shop", le="1"}'
+        values: '0+300x20'
+      - series: 'http_request_duration_seconds_bucket{namespace="shop", service="shop", le="2.5"}'
+        values: '0+600x20'
+      - series: 'http_request_duration_seconds_bucket{namespace="shop", service="shop", le="+Inf"}'
+        values: '0+600x20'
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: HighLatency
+        exp_alerts:
+          - exp_labels: {severity: warning, namespace: shop, service: shop}
+            exp_annotations:
+              summary: "shop p95 latency is 2.35s"
+              description: "95% of requests to shop took longer than 500 ms for 5 minutes."
+
+  # ---- crash loop in a workload namespace; the same in a platform namespace is ignored ----
+  - interval: 1m
+    input_series:
+      - series: 'kube_pod_container_status_restarts_total{namespace="shop", pod="shop-1", container="app"}'
+        values: '0+1x20'
+      - series: 'kube_pod_container_status_restarts_total{namespace="monitoring", pod="loki-0", container="loki"}'
+        values: '0+1x20'
+    alert_rule_test:
+      - eval_time: 18m
+        alertname: PodRestarting
+        exp_alerts:
+          - exp_labels: {severity: warning, namespace: shop, pod: shop-1, container: app}
+            exp_annotations:
+              summary: "shop/shop-1 restarted more than twice in 15 minutes"
+              description: "Container app keeps restarting. kubectl -n shop logs shop-1 --previous"

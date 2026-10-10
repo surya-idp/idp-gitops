@@ -2,7 +2,7 @@
 # Validate everything Argo CD would apply: render every Kustomize overlay and check the output,
 # plus the plain manifests, against Kubernetes + CRD JSON schemas. Run by CI on every push/PR
 # (required check on main) and locally: ./scripts/validate.sh
-# (needs kubectl, kubeconform, helm, kyverno CLI, python3 + PyYAML)
+# (needs kubectl, kubeconform, helm, kyverno CLI, docker, python3 + PyYAML)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -50,4 +50,6 @@ for f in platform/argocd-apps/*.yaml; do
 done
 # Admission policies: everything deployed passes them, and each one rejects its bad example.
 ./scripts/policy-test.sh || fail=1
+# Alert rules: promtool syntax check and unit tests.
+./scripts/rules-test.sh || fail=1
 exit $fail

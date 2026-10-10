@@ -54,6 +54,8 @@ spec:
       labels:
         app: feature-flag-api
         app.kubernetes.io/part-of: feature-flag-service
+        # Prometheus scrapes /metrics on port `http` (platform/monitoring/podmonitor.yaml).
+        idp.surya-idp/metrics: "true"
     spec:
       terminationGracePeriodSeconds: 40   # preStop 20s + uvicorn graceful shutdown
       # platform/cluster/priorityclasses.yaml: preempted after non-critical platform pods.

@@ -30,13 +30,16 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
 spec:
-  description: Cluster-wide platform config and controllers (secret store, priority classes, Image Updater, database operator, Kyverno and its policies)
+  description: Cluster-wide platform config and controllers (secret store, priority classes, Image Updater, database operator, Kyverno and its policies, the monitoring stack)
   sourceRepos:
     - https://github.com/surya-idp/idp-gitops
     # Helm charts of platform controllers. Listed one by one: a project that may pull any
     # chart may install anything.
     - https://movetokube.github.io/postgres-operator/
     - https://kyverno.github.io/kyverno/
+    - https://prometheus-community.github.io/helm-charts
+    - https://grafana.github.io/helm-charts
+    - https://grafana-community.github.io/helm-charts
   destinations:
     - server: https://kubernetes.default.svc
       namespace: "*"

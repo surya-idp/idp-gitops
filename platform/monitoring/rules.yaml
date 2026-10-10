@@ -1,0 +1,65 @@
+# Alerts for the services on the platform. Four questions, the same for every service:
+# is it up, is it failing, is it slow, is it crash-looping.
+#
+# The request metrics (http_requests_total, http_request_duration_seconds) are produced by the
+# golden-path skeleton's middleware with the labels service, method, path, status. Every rule
+# is unit-tested with promtool (tests/prometheus/rules_test.yaml): a rule that has never fired
+# in a test is a rule nobody knows works.
+#
+# `for:` means "true continuously for this long", so one bad scrape does not page anyone.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: idp-services
+spec:
+  groups:
+    - name: idp-services
+      rules:
+        - alert: ServiceDown
+          # `up` is 1 when Prometheus scraped the pod successfully. Zero healthy pods of a
+          # service means nobody is serving it.
+          expr: sum by (namespace, service) (up{job="monitoring/idp-services"}) == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "{{ $labels.service }} has no scrapeable pods"
+            description: "No pod of {{ $labels.service }} in {{ $labels.namespace }} answered /metrics for 2 minutes."
+
+        - alert: HighErrorRate
+          # Share of responses that are 5xx (the service's fault; 4xx is the caller's).
+          expr: |
+            sum by (namespace, service) (rate(http_requests_total{status=~"5.."}[5m]))
+              /
+            sum by (namespace, service) (rate(http_requests_total[5m]))
+              > 0.05
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "{{ $labels.service }} is failing {{ $value | humanizePercentage }} of requests"
+            description: "More than 5% of requests to {{ $labels.service }} returned 5xx for 5 minutes."
+
+        - alert: HighLatency
+          # 95th percentile: 19 of 20 requests are faster than this. Averages hide slow tails.
+          expr: |
+            histogram_quantile(0.95,
+              sum by (namespace, service, le) (rate(http_request_duration_seconds_bucket[5m])))
+              > 0.5
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{ $labels.service }} p95 latency is {{ $value | humanizeDuration }}"
+            description: "95% of requests to {{ $labels.service }} took longer than 500 ms for 5 minutes."
+
+        - alert: PodRestarting
+          # From kube-state-metrics, so it also covers services that export no metrics.
+          expr: |
+            increase(kube_pod_container_status_restarts_total{namespace!~"kube-system|argocd|kyverno|external-secrets|db-operator|monitoring"}[15m]) > 2
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{ $labels.namespace }}/{{ $labels.pod }} restarted more than twice in 15 minutes"
+            description: "Container {{ $labels.container }} keeps restarting. kubectl -n {{ $labels.namespace }} logs {{ $labels.pod }} --previous"

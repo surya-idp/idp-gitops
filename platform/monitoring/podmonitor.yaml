@@ -1,0 +1,25 @@
+# One rule for "what does Prometheus scrape": any pod, in any namespace, that carries the label
+# idp.surya-idp/metrics: "true" and has a container port named `http` serving /metrics.
+#
+# A service opts in with a label instead of shipping its own monitor resource. Golden-path
+# services get the label from components/golden-path; the flag API sets it in its Deployment.
+#
+# Labels on every scraped series: namespace, pod, and `service` (from app.kubernetes.io/name),
+# so dashboards and alerts speak in service names.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: idp-services
+spec:
+  namespaceSelector:
+    any: true
+  selector:
+    matchLabels:
+      idp.surya-idp/metrics: "true"
+  podMetricsEndpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+          targetLabel: service

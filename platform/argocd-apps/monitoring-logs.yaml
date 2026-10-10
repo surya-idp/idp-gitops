@@ -1,0 +1,162 @@
+# App-of-apps children: logs. Loki stores them; Alloy collects them.
+#
+# Loki in "single binary" mode: one pod, chunks on the pod's own disk, 24 h kept. That is the
+# smallest real Loki. Production: object storage (S3) and the scalable deployment modes.
+#
+# Alloy reads container logs through the Kubernetes API (one Deployment, no DaemonSet and no
+# host mounts) and labels each line with namespace, pod, container and the service name.
+# The apps already log JSON with request_id and trace_id, so Grafana can filter on fields.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring-loki
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    chart: loki
+    targetRevision: 7.3.0             # Loki 3.6
+    helm:
+      releaseName: loki
+      valuesObject:
+        fullnameOverride: loki
+        deploymentMode: SingleBinary
+        loki:
+          auth_enabled: false
+          commonConfig:
+            replication_factor: 1
+          storage:
+            type: filesystem
+          schemaConfig:
+            configs:
+              - from: "2024-04-01"
+                store: tsdb
+                object_store: filesystem
+                schema: v13
+                index:
+                  prefix: loki_index_
+                  period: 24h
+          limits_config:
+            retention_period: 24h
+          compactor:
+            retention_enabled: true
+            delete_request_store: filesystem
+        singleBinary:
+          replicas: 1
+          persistence:
+            enabled: false
+          extraVolumes:
+            - name: data
+              emptyDir: {sizeLimit: 1Gi}
+          extraVolumeMounts:
+            - name: data
+              mountPath: /var/loki
+          resources:
+            requests: {cpu: 30m, memory: 160Mi}
+            limits: {memory: 400Mi}
+        # Everything below belongs to the scalable modes or to self-monitoring.
+        read: {replicas: 0}
+        write: {replicas: 0}
+        backend: {replicas: 0}
+        gateway: {enabled: false}
+        chunksCache: {enabled: false}
+        resultsCache: {enabled: false}
+        lokiCanary: {enabled: false}
+        test: {enabled: false}
+        monitoring:
+          selfMonitoring: {enabled: false, grafanaAgent: {installOperator: false}}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring-alloy
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    chart: alloy
+    targetRevision: 1.13.0            # Alloy v1.20.0
+    helm:
+      releaseName: alloy
+      valuesObject:
+        fullnameOverride: alloy
+        controller:
+          type: deployment
+          replicas: 1
+        alloy:
+          resources:
+            requests: {cpu: 20m, memory: 96Mi}
+            limits: {memory: 256Mi}
+          configMap:
+            content: |
+              // Every pod in a workload namespace.
+              discovery.kubernetes "pods" {
+                role = "pod"
+              }
+
+              discovery.relabel "pods" {
+                targets = discovery.kubernetes.pods.targets
+
+                // Platform namespaces log a lot and are read with kubectl when needed.
+                rule {
+                  source_labels = ["__meta_kubernetes_namespace"]
+                  regex         = "kube-system|kube-public|kube-node-lease|argocd|kyverno|external-secrets|db-operator|monitoring"
+                  action        = "drop"
+                }
+                rule {
+                  source_labels = ["__meta_kubernetes_namespace"]
+                  target_label  = "namespace"
+                }
+                rule {
+                  source_labels = ["__meta_kubernetes_pod_name"]
+                  target_label  = "pod"
+                }
+                rule {
+                  source_labels = ["__meta_kubernetes_pod_container_name"]
+                  target_label  = "container"
+                }
+                // The platform-wide service label (policy require-labels guarantees it).
+                rule {
+                  source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name"]
+                  target_label  = "service"
+                }
+              }
+
+              loki.source.kubernetes "pods" {
+                targets    = discovery.relabel.pods.output
+                forward_to = [loki.write.default.receiver]
+              }
+
+              loki.write "default" {
+                endpoint {
+                  url = "http://loki.monitoring.svc:3100/loki/api/v1/push"
+                }
+              }
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

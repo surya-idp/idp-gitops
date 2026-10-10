@@ -1,0 +1,54 @@
+# App-of-apps child: traces. Tempo (single binary) receives OpenTelemetry traces from the
+# services and keeps them for 6 hours on the pod's own disk.
+#
+# A trace is the path of ONE request: each step (HTTP handler, database query, cache lookup)
+# is a timed "span". It answers "where did this slow request spend its time", which metrics
+# (averages over many requests) and logs (text lines) cannot.
+#
+# Services send traces to http://tempo.monitoring.svc:4318 (OTLP over HTTP). Golden-path
+# services get that address from components/golden-path; nothing is sent when it is unset.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring-tempo
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    # grafana-community: the Tempo single-binary chart moved there from grafana/helm-charts
+    # (the old location is deprecated since 2026-01-30).
+    repoURL: https://grafana-community.github.io/helm-charts
+    chart: tempo
+    targetRevision: 2.4.0             # Tempo 2.10
+    helm:
+      releaseName: tempo
+      valuesObject:
+        fullnameOverride: tempo
+        tempo:
+          retention: 6h
+          reportingEnabled: false
+          receivers:
+            otlp:
+              protocols:
+                http:
+                  endpoint: 0.0.0.0:4318
+                grpc:
+                  endpoint: 0.0.0.0:4317
+          resources:
+            requests: {cpu: 20m, memory: 128Mi}
+            limits: {memory: 384Mi}
+        persistence:
+          enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

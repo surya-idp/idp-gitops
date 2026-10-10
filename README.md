@@ -11,6 +11,9 @@ platform/
     feature-flag-dev.yaml   wave 1 -> apps/feature-flag-service/overlays/dev
     idp-portal.yaml         wave 1 -> apps/idp-portal/overlays/dev (Backstage, port-forward only)
     kyverno.yaml            wave 0 -> Helm chart kyverno + platform/kyverno (policies)
+    monitoring-stack.yaml   wave 0 -> kube-prometheus-stack (Prometheus, Grafana, Alertmanager) + platform/monitoring
+    monitoring-logs.yaml    wave 0 -> Loki (stores logs) and Alloy (collects them)
+    monitoring-traces.yaml  wave 0 -> Tempo (traces)
     db-operator.yaml        wave 0 -> Helm chart ext-postgres-operator + platform/db-operator
     image-updater.yaml      wave 1 -> platform/image-updater
     golden-path-services.yaml  ApplicationSet: one Application per apps/<name>/overlays/dev
@@ -19,6 +22,9 @@ platform/
                     see argocd-apps/db-operator.yaml). The only place the RDS master password lives.
   image-updater/    Argo CD Image Updater: new ECR image of a golden-path service -> commits
                     newTag to its dev overlay as idp-ci-bot (ECR login via IRSA)
+  monitoring/       what the monitoring stack does for us: which pods are scraped (label
+                    idp.surya-idp/metrics), alert rules, the alert receiver, Grafana's login and
+                    the per-service dashboard. The stack is four charts: argocd-apps/monitoring-*.yaml
   kyverno/          the admission policies (Kyverno itself is a Helm chart, argocd-apps/kyverno.yaml):
                     non-root, resource requests/limits, ECR-only images, no `latest`, service
                     label, probes, database name = namespace, signed build provenance (audit)
@@ -36,11 +42,13 @@ components/
                     rollout, restricted pod security, probes, zone spreading, HPA metric, PDB
   public-route/     opt-in: a path on the shared ALB
   postgres/         opt-in: a database and a login of its own, as DATABASE_* env vars
+tests/prometheus/   promtool unit tests: each alert fires on bad data, stays quiet on good data
 tests/kyverno/      one folder per policy: a manifest it must reject, and one it must accept
 tests/golden-path-service/  never deployed; a sample service so `validate` checks every
                     change to components/ even when apps/ holds no golden-path service
 scripts/validate.sh render every overlay and every Helm chart an Application installs,
                     schema-check the result, then run the policy tests (CI required check)
+scripts/rules-test.sh   promtool: alert rule syntax and unit tests
 scripts/policy-test.sh  Kyverno CLI: everything deployed passes the policies; each policy
                     rejects its bad example
 ```
@@ -63,3 +71,12 @@ CRD schemas. `main` is protected by a ruleset: no force-push or deletion, and ch
 through a PR with the `validate` check green. Only the `idp-ci-bot` App bypasses the ruleset
 (image tag commits). Backstage opens a PR like a human and turns on GitHub auto-merge, so
 GitHub merges it only when `validate` passes.
+
+## Looking at the platform (cluster up)
+
+| What | How |
+|---|---|
+| Grafana (dashboards, logs, traces) | `kubectl -n monitoring port-forward svc/kps-grafana 3000:80` -> http://localhost:3000, user `admin`, password: `kubectl -n monitoring get secret grafana-admin -o jsonpath='{.data.admin-password}' \| base64 -d` |
+| Prometheus (targets, queries) | `kubectl -n monitoring port-forward svc/kps-prometheus 9090` -> http://localhost:9090/targets |
+| Alerts that fired | `kubectl -n monitoring logs deploy/alert-receiver` |
+| Policy results | `kubectl get policyreport -A` |
