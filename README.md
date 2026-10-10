@@ -43,7 +43,9 @@ apps/<service>/     added by the Backstage python-service template (a PR that me
                     Holds only what is specific to the service (name, image, port, env, sizes).
 components/
   golden-path/      the platform's standard for those services, in one place: zero-downtime
-                    rollout, restricted pod security, probes, zone spreading, HPA metric, PDB
+                    rollout, restricted pod security, probes, zone spreading, HPA metric, PDB,
+                    metrics and tracing, and a NetworkPolicy (only the load balancer,
+                    Prometheus and the same namespace may connect)
   public-route/     opt-in: a path on the shared ALB
   postgres/         opt-in: a database and a login of its own, as DATABASE_* env vars
 tests/prometheus/   promtool unit tests: each alert fires on bad data, stays quiet on good data

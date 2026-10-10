@@ -1,0 +1,26 @@
+# Who may talk TO the flag API's pods (PLATFORM_REVIEW F13). Same rule as golden-path services
+# (components/golden-path/networkpolicy.yaml explains each line): the shared load balancer
+# (public subnets), Prometheus, and pods of this namespace (the migration Job).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-from-platform
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 10.0.1.0/24
+        - ipBlock:
+            cidr: 10.0.2.0/24
+      ports:
+        - port: 8000          # the `http` container port of every service on this platform
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: 8000          # the `http` container port of every service on this platform
+    - from:
+        - podSelector: {}
