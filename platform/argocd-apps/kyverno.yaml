@@ -30,13 +30,11 @@ spec:
       helm:
         releaseName: kyverno
         valuesObject:
+          # The admission controller's ServiceAccount (kyverno-admission-controller) gets the
+          # IAM role idp-kyverno through EKS Pod Identity (idp-infra/30-cluster): read image
+          # attestations from ECR svc/*.
           admissionController:
             replicas: 1
-            rbac:
-              serviceAccount:
-                annotations:
-                  # IRSA: read image attestations from ECR svc/* (idp-infra/30-cluster).
-                  eks.amazonaws.com/role-arn: arn:aws:iam::693906847772:role/idp-kyverno
           reportsController:
             replicas: 1
           backgroundController:

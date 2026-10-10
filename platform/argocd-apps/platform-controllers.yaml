@@ -1,0 +1,103 @@
+# App-of-apps children: the two controllers everything else depends on. Until 2026-10-10
+# Terraform installed both (PLATFORM_REVIEW F9); now Argo CD does, like the rest of the cluster.
+#
+# Order matters, in both directions:
+#   wave -2  AWS Load Balancer Controller   first up: its webhook checks every Service, so
+#                                           anything creating a Service waits for it
+#                                           (Finding 30). LAST down: it must still be running
+#                                           when the apps' Ingresses are deleted, or their ALB
+#                                           would be left behind in AWS.
+#   wave -1  External Secrets               before any ExternalSecret (wave 0 and later)
+#
+# AWS permissions: none are configured here. EKS Pod Identity gives each controller its role
+# through an association in idp-infra/30-cluster (ServiceAccount -> role).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: aws-load-balancer-controller
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://aws.github.io/eks-charts
+    chart: aws-load-balancer-controller
+    targetRevision: 3.5.0             # controller v3.5.0; its IAM policy version is pinned in idp-infra/30-cluster
+    helm:
+      releaseName: aws-load-balancer-controller
+      valuesObject:
+        clusterName: idp-cluster
+        region: ap-south-1
+        # The permanent VPC (idp-infra/10-network). Given explicitly so the controller does not
+        # need the instance metadata service to find it.
+        vpcId: vpc-0adcac5ff98908f3b
+        serviceAccount:
+          name: aws-load-balancer-controller
+        replicaCount: 1               # t4g.small nodes are small and this is a lab
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  # The chart generates a new self-signed webhook certificate every time it is rendered, and
+  # Argo CD renders on every refresh. Without this, Argo CD would see a "change" each time and
+  # keep replacing a working certificate. The first sync creates them; after that they are
+  # left alone.
+  ignoreDifferences:
+    - kind: Secret
+      name: aws-load-balancer-tls
+      namespace: kube-system
+      jsonPointers: [/data]
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      name: aws-load-balancer-webhook
+      jqPathExpressions: ['.webhooks[].clientConfig.caBundle']
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      name: aws-load-balancer-webhook
+      jqPathExpressions: ['.webhooks[].clientConfig.caBundle']
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: external-secrets
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://charts.external-secrets.io
+    chart: external-secrets
+    targetRevision: 2.11.0            # serves external-secrets.io/v1 only
+    helm:
+      releaseName: external-secrets
+      valuesObject:
+        installCRDs: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: external-secrets
+  # External Secrets' cert-controller writes its certificate into these webhook
+  # configurations at run time; Git has the field empty. Not a drift to heal.
+  ignoreDifferences:
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      jqPathExpressions: ['.webhooks[].clientConfig.caBundle']
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
