@@ -1,0 +1,26 @@
+# The platform's deployment standard for golden-path services, kept in ONE place.
+#
+# A service (apps/<name>/base) lists only what is its own: name, image, port, env, resource
+# sizes, replica bounds. This component adds everything the platform decides for all of them:
+# zero-downtime rollout settings, restricted pod security, probes, spreading, autoscaling
+# metric, disruption budget. Changing a file here changes every service on the next sync;
+# the `validate` check renders every service against the change before it can merge.
+#
+# Used from a service's base kustomization:
+#   components:
+#     - ../../../components/golden-path
+#
+# The patches select by kind, so they apply whatever the service is called. The container
+# must be named `app` and listen on a port named `http`.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+patches:
+  - path: deployment.yaml
+    target:
+      kind: Deployment
+  - path: hpa.yaml
+    target:
+      kind: HorizontalPodAutoscaler
+  - path: pdb.yaml
+    target:
+      kind: PodDisruptionBudget

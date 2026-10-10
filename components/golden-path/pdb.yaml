@@ -1,0 +1,8 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: any
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  minAvailable: 1
