@@ -1,0 +1,32 @@
+# Backstage's own database and login (PLATFORM_REVIEW F3). Before this it connected as the RDS
+# master user and created one database per plugin (backstage_plugin_*), which needs the
+# CREATEDB right. Now it owns exactly one database, `backstage`, and keeps each plugin in its
+# own schema inside it (app-config.production.yaml: pluginDivisionMode: schema).
+apiVersion: db.movetokube.com/v1alpha1
+kind: Postgres
+metadata:
+  name: database
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  database: backstage
+  dropOnDelete: false
+---
+apiVersion: db.movetokube.com/v1alpha1
+kind: PostgresUser
+metadata:
+  name: credentials
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  role: idp-portal
+  database: database
+  secretName: idp-portal-db         # Secret: idp-portal-db-credentials
+  privileges: OWNER
+  secretTemplate:
+    # The variable names app-config.production.yaml reads.
+    POSTGRES_HOST: "{{.Hostname}}"
+    POSTGRES_PORT: "{{.Port}}"
+    POSTGRES_USER: "{{.Role}}"
+    POSTGRES_PASSWORD: "{{.Password}}"
+    POSTGRES_DB: "{{.Database}}"

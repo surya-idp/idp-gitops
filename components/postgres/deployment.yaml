@@ -1,0 +1,14 @@
+# Hands the credentials to the service's container. Until the operator has created the Secret
+# the pod waits in CreateContainerConfigError and then starts by itself; nothing to order.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: any
+spec:
+  template:
+    spec:
+      containers:
+        - name: app
+          envFrom:
+            - secretRef:
+                name: database-credentials

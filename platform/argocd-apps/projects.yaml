@@ -30,9 +30,12 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
 spec:
-  description: Cluster-wide platform config (ClusterSecretStore, PriorityClasses, Image Updater)
+  description: Cluster-wide platform config and controllers (secret store, priority classes, Image Updater, database operator)
   sourceRepos:
     - https://github.com/surya-idp/idp-gitops
+    # Helm charts of platform controllers. Listed one by one: a project that may pull any
+    # chart may install anything.
+    - https://movetokube.github.io/postgres-operator/
   destinations:
     - server: https://kubernetes.default.svc
       namespace: "*"
@@ -48,6 +51,9 @@ spec:
       kind: ClusterRole
     - group: rbac.authorization.k8s.io
       kind: ClusterRoleBinding
+    # Platform controllers get namespaces of their own (CreateNamespace=true).
+    - group: ""
+      kind: Namespace
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject

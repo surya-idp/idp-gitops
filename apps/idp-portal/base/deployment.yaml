@@ -36,8 +36,9 @@ spec:
             - containerPort: 7007
               name: http
           envFrom:
+            # Own database login from the database operator (database.yaml).
             - secretRef:
-                name: idp-portal-db
+                name: idp-portal-db-credentials
             - secretRef:
                 name: idp-portal-github
           env:

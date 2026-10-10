@@ -98,6 +98,9 @@ spec:
           envFrom:
             - secretRef:
                 name: feature-flag-secrets
+            # Its own database login, created by the database operator (database.yaml).
+            - secretRef:
+                name: feature-flag-db-credentials
 
           env:
             - name: JWT_ALGORITHM

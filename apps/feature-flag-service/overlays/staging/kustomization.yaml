@@ -1,7 +1,7 @@
 # staging: DEFINED BUT NOT DEPLOYED. No Argo CD Application points here yet.
 #
 # Deploying it for real needs, beyond enabling an Application:
-#   - its own database (today every overlay reads idp/db-creds, i.e. dev's DB)
+#   - its own database (base/database.yaml names one database, feature_flags: patch it per environment)
 #   - a distinct Ingress rule: all envs join ALB group "idp" with path "/", which
 #     would collide. Needs a host rule (domain + ACM, deferred) or listener-port split.
 #   - more node capacity (2x t4g.small is sized for dev only)

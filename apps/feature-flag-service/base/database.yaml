@@ -1,0 +1,31 @@
+# The flag API's own database login (PLATFORM_REVIEW F3). The database operator
+# (platform/db-operator) creates the role and writes the Secret feature-flag-db-credentials.
+# Before this the API connected as the RDS master user.
+#
+# `feature_flags` is the database RDS creates with the instance; the operator adopts it and
+# makes this app's role its owner, so the API can still run its migrations (OWNER).
+apiVersion: db.movetokube.com/v1alpha1
+kind: Postgres
+metadata:
+  name: database
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  database: feature_flags
+  # The instance is destroyed with the session; dropping first would only slow teardown.
+  dropOnDelete: false
+---
+apiVersion: db.movetokube.com/v1alpha1
+kind: PostgresUser
+metadata:
+  name: credentials
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  role: feature-flag-service
+  database: database
+  secretName: feature-flag-db       # Secret: feature-flag-db-credentials
+  privileges: OWNER
+  secretTemplate:
+    # SQLAlchemy URL with the psycopg2 driver, the format the app has always read.
+    DATABASE_URL: "postgresql+psycopg2://{{.Role}}:{{.Password}}@{{.Host}}/{{.Database}}"

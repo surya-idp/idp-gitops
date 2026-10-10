@@ -1,0 +1,55 @@
+# App-of-apps child: the database operator (ext-postgres-operator). It is the ONLY thing in the
+# cluster that holds the RDS master credentials. Apps declare a `Postgres` and a `PostgresUser`
+# in their own namespace and get a database plus a login of their own (PLATFORM_REVIEW F3).
+#
+# Two sources: the upstream Helm chart, and platform/db-operator in this repo (the
+# ExternalSecret that hands the operator the master credentials from Secrets Manager).
+# Wave 0, on purpose, for TEARDOWN: Argo CD deletes in reverse wave order, and the operator
+# must outlive the apps (wave 1). Each database resource has a finalizer that only the operator
+# can clear; if the operator went first, app namespaces would hang in Terminating and
+# `make down` would wait for its timeout. Its ExternalSecret needs the ClusterSecretStore of
+# platform-cluster (also wave 0) and simply retries until that is ready.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: db-operator
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  sources:
+    - repoURL: https://movetokube.github.io/postgres-operator/
+      chart: ext-postgres-operator
+      targetRevision: 3.0.0          # operator 2.4.0
+      helm:
+        releaseName: db-operator
+        valuesObject:
+          fullnameOverride: db-operator
+          # Created by the ExternalSecret in platform/db-operator (second source).
+          existingSecret: db-operator-credentials
+          # One small Go controller; upstream sets no requests at all.
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+    - repoURL: https://github.com/surya-idp/idp-gitops
+      targetRevision: HEAD
+      path: platform/db-operator
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: db-operator
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    managedNamespaceMetadata:
+      labels:
+        pod-security.kubernetes.io/enforce: restricted

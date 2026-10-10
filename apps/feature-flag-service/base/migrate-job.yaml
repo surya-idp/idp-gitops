@@ -54,6 +54,9 @@ spec:
           envFrom:
             - secretRef:
                 name: feature-flag-secrets
+            # Its own database login, created by the database operator (database.yaml).
+            - secretRef:
+                name: feature-flag-db-credentials
           resources:
             requests:
               cpu: "50m"

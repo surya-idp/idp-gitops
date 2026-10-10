@@ -1,0 +1,7 @@
+# What the database operator needs from this repo: its credentials. The operator itself comes
+# from the upstream Helm chart (platform/argocd-apps/db-operator.yaml).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: db-operator
+resources:
+  - externalsecret.yaml
