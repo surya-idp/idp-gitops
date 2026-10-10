@@ -1,0 +1,34 @@
+# Containers must not run as root.
+#
+# A process that is root inside a container is root on the node if it escapes. Every image
+# on this platform already runs as a numbered non-root user; this stops a new one from
+# quietly not doing so.
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: require-non-root
+spec:
+  validationActions: [Deny]
+  # Also check the pod template inside Deployments, Jobs ...: the author sees the rejection on
+  # the resource they applied, not later on a pod that silently never appears.
+  autogen:
+    podControllers:
+      controllers: [deployments, statefulsets, daemonsets, jobs, cronjobs]
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ['']
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+    namespaceSelector:
+      matchExpressions:
+        # Workload namespaces only. Platform namespaces must keep working even when a policy
+        # is wrong, and their charts are not ours to rewrite.
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values: [kube-system, kube-public, kube-node-lease, default, argocd, kyverno, external-secrets, db-operator, monitoring]
+  validations:
+    - expression: >-
+        object.spec.?securityContext.?runAsNonRoot.orValue(false) ||
+        object.spec.containers.all(c, c.?securityContext.?runAsNonRoot.orValue(false))
+      message: "Containers must not run as root: set securityContext.runAsNonRoot: true on the pod or on every container."

@@ -1,0 +1,28 @@
+# The platform's admission policies. Kyverno itself is the Helm chart in
+# platform/argocd-apps/kyverno.yaml; this folder is what it enforces.
+#
+# All policies use the policies.kyverno.io/v1 types (ValidatingPolicy, ImageValidatingPolicy):
+# rules are CEL expressions, the same language as Kubernetes' own ValidatingAdmissionPolicy.
+# The older kyverno.io/v1 ClusterPolicy format is deprecated since Kyverno 1.19.
+#
+# Scope: workload namespaces only. System and platform namespaces are excluded in each policy
+# (match-workloads.yaml explains the selector), so a policy can never lock the platform out.
+#
+# Every policy is tested offline in CI (tests/kyverno): a manifest that must pass and one that
+# must be rejected, per rule. A policy that has not been seen rejecting something enforces
+# nothing you can rely on.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - require-non-root.yaml
+  - require-resource-limits.yaml
+  - restrict-image-registries.yaml
+  - disallow-latest-tag.yaml
+  - require-labels.yaml
+  - require-probes.yaml
+  - database-name-matches-namespace.yaml
+  - verify-image-provenance.yaml
+commonAnnotations:
+  # The CRDs come from the chart in the same sync: wait for them, do not dry-run before.
+  argocd.argoproj.io/sync-wave: "1"
+  argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true

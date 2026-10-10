@@ -1,0 +1,34 @@
+# A service may only ask for the database named like its own namespace.
+#
+# The database operator acts on Postgres/PostgresUser resources in any namespace. Without this
+# rule a service could declare a database with ANOTHER service's name and receive an owner
+# login for it. Golden-path services get their database through components/postgres, which
+# names it after the service, which is also its namespace.
+#
+# The two apps that predate the golden path use fixed names and are listed explicitly.
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: database-name-matches-namespace
+spec:
+  validationActions: [Deny]
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [db.movetokube.com]
+        apiVersions: [v1alpha1]
+        operations: [CREATE, UPDATE]
+        # `postgres` is the resource's real plural in the cluster (see its CRD). `postgreses` is
+        # what the offline Kyverno CLI derives from the kind name; listing it lets CI test this
+        # policy, and a name that matches nothing is harmless in the cluster.
+        resources: [postgres, postgreses]
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values: [kube-system, kube-public, kube-node-lease, default, argocd, kyverno, external-secrets, db-operator, monitoring]
+  validations:
+    - expression: >-
+        object.spec.database == object.metadata.namespace ||
+        (object.metadata.namespace == 'feature-flag-dev' && object.spec.database == 'feature_flags') ||
+        (object.metadata.namespace == 'backstage' && object.spec.database == 'backstage')
+      message: "A Postgres resource may only declare the database named like its namespace."

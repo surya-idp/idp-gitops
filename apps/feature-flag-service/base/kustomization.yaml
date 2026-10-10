@@ -17,3 +17,11 @@ resources:
   - ingress.yaml
   - hpa.yaml
   - pdb.yaml
+# The platform-wide service label (policy require-labels; also used by Backstage, dashboards
+# and NetworkPolicy). Added to resources and pod templates only: selectors are immutable, and
+# changing them would force the Deployment to be recreated.
+labels:
+  - pairs:
+      app.kubernetes.io/name: feature-flag-service
+    includeTemplates: true
+    includeSelectors: false

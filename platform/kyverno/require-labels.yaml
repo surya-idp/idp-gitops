@@ -1,0 +1,33 @@
+# Pods carry app.kubernetes.io/name.
+#
+# The label answers "which service is this pod?" for people, for Backstage, for dashboards
+# and for NetworkPolicy. A pod without it is invisible to all of them.
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: require-labels
+spec:
+  validationActions: [Deny]
+  # Also check the pod template inside Deployments, Jobs ...: the author sees the rejection on
+  # the resource they applied, not later on a pod that silently never appears.
+  autogen:
+    podControllers:
+      controllers: [deployments, statefulsets, daemonsets, jobs, cronjobs]
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ['']
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+    namespaceSelector:
+      matchExpressions:
+        # Workload namespaces only. Platform namespaces must keep working even when a policy
+        # is wrong, and their charts are not ours to rewrite.
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values: [kube-system, kube-public, kube-node-lease, default, argocd, kyverno, external-secrets, db-operator, monitoring]
+  validations:
+    - expression: >-
+        has(object.metadata.labels) && 'app.kubernetes.io/name' in object.metadata.labels &&
+        object.metadata.labels['app.kubernetes.io/name'] != ''
+      message: "Pods need the label app.kubernetes.io/name (the service's name)."

@@ -20,6 +20,8 @@ jobs:
     env:
       KUBECONFORM_VERSION: v0.8.0
       KUBECONFORM_SHA256: 9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883
+      KYVERNO_VERSION: v1.19.1
+      KYVERNO_SHA256: b38228f367fc0fdc2b08f4c83ea50ac5f16c60ff8d62d76a66157c33c47b70ae
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install kubeconform (pinned + checksum)
@@ -27,6 +29,11 @@ jobs:
           curl -sSfL -o kc.tgz "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz"
           echo "${KUBECONFORM_SHA256}  kc.tgz" | sha256sum -c -
           tar xzf kc.tgz kubeconform && sudo mv kubeconform /usr/local/bin/
+      - name: Install the Kyverno CLI (pinned + checksum)
+        run: |
+          curl -sSfL -o kyverno.tgz "https://github.com/kyverno/kyverno/releases/download/${KYVERNO_VERSION}/kyverno-cli_${KYVERNO_VERSION}_linux_x86_64.tar.gz"
+          echo "${KYVERNO_SHA256}  kyverno.tgz" | sha256sum -c -
+          tar xzf kyverno.tgz kyverno && sudo mv kyverno /usr/local/bin/
       - name: PyYAML for scripts/crd-schemas.py
         run: python3 -c 'import yaml' || pip install --user pyyaml==6.0.2
       - name: Render and validate
