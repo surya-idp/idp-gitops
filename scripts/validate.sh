@@ -7,6 +7,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 K8S_VERSION="${K8S_VERSION:-1.35.0}"   # EKS version (idp-infra/30-cluster)
+CRD_CATALOG_REF="${CRD_CATALOG_REF:-f1e7f6bc0537bf0622ffe6e47dbaa85914fabbec}"   # datreeio/CRDs-catalog, 2026-10 before #988
 # CRDs that a kustomization installs itself (Image Updater) are turned into schemas here, so
 # its custom resources are checked against the pinned version, not the public catalog's copy.
 LOCAL_SCHEMAS="$(mktemp -d)"
@@ -16,8 +17,11 @@ KC=(kubeconform -strict -summary -output text -kubernetes-version "$K8S_VERSION"
     -skip CustomResourceDefinition
     -schema-location default
     -schema-location "$LOCAL_SCHEMAS/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json"
-    # CRDs (Argo CD Application, ExternalSecret, ClusterSecretStore, Kyverno ...)
-    -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json')
+    # CRDs (Argo CD Application, ExternalSecret, ClusterSecretStore, Kyverno ...). The catalog
+    # is pinned by commit: its 2026-10-08 update of the external-secrets.io schemas cannot be
+    # loaded by kubeconform v0.8.0 ("could not find schema for ClusterSecretStore"), which
+    # turned this check red with no change in this repo. Bump the pin deliberately.
+    -schema-location "https://raw.githubusercontent.com/datreeio/CRDs-catalog/${CRD_CATALOG_REF}/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json")
 
 fail=0
 rendered="$(mktemp)"
