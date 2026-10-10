@@ -1,0 +1,39 @@
+# Opt-in: a PostgreSQL database and a login of its own for a golden-path service.
+#   components:
+#     - ../../../components/postgres
+#
+# What the service gets:
+#   - a database named like the service, on the shared RDS instance
+#   - a role that owns it (so the service can run its own migrations) and nothing else
+#   - the Secret `database-credentials` in its namespace, mounted into the `app` container as
+#     DATABASE_URL, DATABASE_HOST, DATABASE_PORT, DATABASE_NAME, DATABASE_USER, DATABASE_PASSWORD
+#
+# How: two custom resources that the database operator (platform/db-operator) acts on. The
+# master password never enters the service's namespace. Removing the service's folder deletes
+# the resources, and the operator then drops the database and the role (dropOnDelete).
+#
+# The names are filled in from the service's Deployment name, so this component needs no
+# per-service copy.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+resources:
+  - database.yaml
+patches:
+  - path: deployment.yaml
+    target:
+      kind: Deployment
+replacements:
+  - source:
+      kind: Deployment
+      fieldPath: metadata.name
+    targets:
+      - select:
+          kind: Postgres
+          name: database
+        fieldPaths:
+          - spec.database
+      - select:
+          kind: PostgresUser
+          name: credentials
+        fieldPaths:
+          - spec.role

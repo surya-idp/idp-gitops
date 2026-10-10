@@ -1,0 +1,31 @@
+apiVersion: db.movetokube.com/v1alpha1
+kind: Postgres
+metadata:
+  name: database
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  database: set-from-deployment-name
+  # Data in this lab does not outlive a session anyway; a removed service must not leave a
+  # database behind on the shared instance.
+  dropOnDelete: true
+---
+apiVersion: db.movetokube.com/v1alpha1
+kind: PostgresUser
+metadata:
+  name: credentials
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  role: set-from-deployment-name
+  database: database          # the Postgres resource above
+  # The operator names the Secret <secretName>-<this resource's name>: database-credentials.
+  secretName: database
+  privileges: OWNER           # the service runs its own migrations
+  secretTemplate:
+    DATABASE_URL: "postgresql://{{.Role}}:{{.Password}}@{{.Host}}/{{.Database}}?sslmode=require"
+    DATABASE_HOST: "{{.Hostname}}"
+    DATABASE_PORT: "{{.Port}}"
+    DATABASE_NAME: "{{.Database}}"
+    DATABASE_USER: "{{.Role}}"
+    DATABASE_PASSWORD: "{{.Password}}"

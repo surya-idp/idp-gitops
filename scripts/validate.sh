@@ -2,7 +2,7 @@
 # Validate everything Argo CD would apply: render every Kustomize overlay and check the output,
 # plus the plain manifests, against Kubernetes + CRD JSON schemas. Run by CI on every push/PR
 # (required check on main) and locally: ./scripts/validate.sh
-# (needs kubectl, kubeconform, python3 + PyYAML)
+# (needs kubectl, kubeconform, helm, python3 + PyYAML)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -25,6 +25,15 @@ KC=(kubeconform -strict -summary -output text -kubernetes-version "$K8S_VERSION"
 
 fail=0
 rendered="$(mktemp)"
+# Helm charts that an Application installs (platform controllers). Rendered first: their CRDs
+# become the schemas for the custom resources that apps declare.
+while read -r release namespace repo chart version values; do
+  echo "==> helm chart $chart $version (Application $release)"
+  if ! helm template "$release" "$chart" --repo "$repo" --version "$version" \
+        --namespace "$namespace" --include-crds --values "$values" > "$rendered"; then fail=1; continue; fi
+  ./scripts/crd-schemas.py "$LOCAL_SCHEMAS" < "$rendered"
+  "${KC[@]}" - < "$rendered" || fail=1
+done < <(./scripts/helm-sources.py platform/argocd-apps)
 # Deployable roots: overlays and standalone kustomizations (bases are covered via overlays).
 # tests/ holds a sample golden-path service, so a change to components/ is always exercised.
 for dir in $(find apps platform tests -name kustomization.yaml -not -path '*/base/*' -printf '%h\n' | sort); do
