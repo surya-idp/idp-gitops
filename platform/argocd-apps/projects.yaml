@@ -30,12 +30,13 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
 spec:
-  description: Cluster-wide platform config and controllers (secret store, priority classes, Image Updater, database operator)
+  description: Cluster-wide platform config and controllers (secret store, priority classes, Image Updater, database operator, Kyverno and its policies)
   sourceRepos:
     - https://github.com/surya-idp/idp-gitops
     # Helm charts of platform controllers. Listed one by one: a project that may pull any
     # chart may install anything.
     - https://movetokube.github.io/postgres-operator/
+    - https://kyverno.github.io/kyverno/
   destinations:
     - server: https://kubernetes.default.svc
       namespace: "*"
@@ -54,6 +55,11 @@ spec:
     # Platform controllers get namespaces of their own (CreateNamespace=true).
     - group: ""
       kind: Namespace
+    # The admission policies themselves (platform/kyverno) are cluster-scoped.
+    - group: policies.kyverno.io
+      kind: ValidatingPolicy
+    - group: policies.kyverno.io
+      kind: ImageValidatingPolicy
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject

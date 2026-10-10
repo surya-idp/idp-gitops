@@ -1,0 +1,67 @@
+# App-of-apps child: Kyverno, the policy engine (Step 33, PLATFORM_REVIEW F5), and the
+# platform's policies (platform/kyverno). Kyverno sits in the API server's admission path:
+# every create/update of a matching resource is checked BEFORE it is stored, so a manifest
+# that breaks a rule is rejected with a message instead of running.
+#
+# Sized for 2 GiB nodes: one admission controller and one reports controller (about 190 Mi of
+# requests together). The background and cleanup controllers are off: no policy here generates,
+# mutates existing resources or deletes anything.
+#
+# Fail-open on purpose (forceFailurePolicyIgnore): with a single replica, a restarting Kyverno
+# would otherwise block every pod creation in the cluster, and at `make down` its webhook
+# registrations outlive its pods. Production: 3 replicas and failurePolicy Fail.
+#
+# Wave 0: policies are in force before any app (wave 1) is created.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kyverno
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  sources:
+    - repoURL: https://kyverno.github.io/kyverno/
+      chart: kyverno
+      targetRevision: 3.9.1          # Kyverno v1.19.1
+      helm:
+        releaseName: kyverno
+        valuesObject:
+          admissionController:
+            replicas: 1
+            rbac:
+              serviceAccount:
+                annotations:
+                  # IRSA: read image attestations from ECR svc/* (idp-infra/30-cluster).
+                  eks.amazonaws.com/role-arn: arn:aws:iam::693906847772:role/idp-kyverno
+          reportsController:
+            replicas: 1
+          backgroundController:
+            enabled: false
+          cleanupController:
+            enabled: false
+          features:
+            forceFailurePolicyIgnore:
+              enabled: true
+          # Helm hooks that Argo CD would not run the way Helm does.
+          webhooksCleanup:
+            enabled: false
+          crds:
+            migration:
+              enabled: false
+    - repoURL: https://github.com/surya-idp/idp-gitops
+      targetRevision: HEAD
+      path: platform/kyverno
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kyverno
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true          # the CRDs exceed the client-side apply annotation limit

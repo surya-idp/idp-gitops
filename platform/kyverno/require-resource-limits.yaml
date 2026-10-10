@@ -1,0 +1,42 @@
+# Every container declares CPU and memory requests and a memory limit.
+#
+# Without requests the scheduler packs pods blindly onto 2 GiB nodes; without a memory limit
+# one leaking pod takes its neighbours down with it. A CPU limit is deliberately NOT required:
+# it throttles a pod that could have used idle CPU.
+#
+# This replaces a LimitRange per namespace (PLATFORM_REVIEW F5): a LimitRange silently
+# injects defaults, this makes the author state the numbers.
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: require-resource-limits
+spec:
+  validationActions: [Deny]
+  # Also check the pod template inside Deployments, Jobs ...: the author sees the rejection on
+  # the resource they applied, not later on a pod that silently never appears.
+  autogen:
+    podControllers:
+      controllers: [deployments, statefulsets, daemonsets, jobs, cronjobs]
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ['']
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+    namespaceSelector:
+      matchExpressions:
+        # Workload namespaces only. Platform namespaces must keep working even when a policy
+        # is wrong, and their charts are not ours to rewrite.
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values: [kube-system, kube-public, kube-node-lease, default, argocd, kyverno, external-secrets, db-operator, monitoring]
+  validations:
+    - expression: >-
+        object.spec.containers.all(c,
+          has(c.resources) && has(c.resources.requests) &&
+          'cpu' in c.resources.requests && 'memory' in c.resources.requests)
+      message: "Every container needs resources.requests.cpu and resources.requests.memory."
+    - expression: >-
+        object.spec.containers.all(c,
+          has(c.resources) && has(c.resources.limits) && 'memory' in c.resources.limits)
+      message: "Every container needs resources.limits.memory."

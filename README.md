@@ -10,6 +10,7 @@ platform/
     platform-cluster.yaml   wave 0 -> platform/cluster
     feature-flag-dev.yaml   wave 1 -> apps/feature-flag-service/overlays/dev
     idp-portal.yaml         wave 1 -> apps/idp-portal/overlays/dev (Backstage, port-forward only)
+    kyverno.yaml            wave 0 -> Helm chart kyverno + platform/kyverno (policies)
     db-operator.yaml        wave 0 -> Helm chart ext-postgres-operator + platform/db-operator
     image-updater.yaml      wave 1 -> platform/image-updater
     golden-path-services.yaml  ApplicationSet: one Application per apps/<name>/overlays/dev
@@ -18,7 +19,9 @@ platform/
                     see argocd-apps/db-operator.yaml). The only place the RDS master password lives.
   image-updater/    Argo CD Image Updater: new ECR image of a golden-path service -> commits
                     newTag to its dev overlay as idp-ci-bot (ECR login via IRSA)
-  kyverno/          Policies. NOT synced until Kyverno is installed (Step 33).
+  kyverno/          the admission policies (Kyverno itself is a Helm chart, argocd-apps/kyverno.yaml):
+                    non-root, resource requests/limits, ECR-only images, no `latest`, service
+                    label, probes, database name = namespace, signed build provenance (audit)
 apps/feature-flag-service/
   base/             Deployment, Service, Ingress, ExternalSecret, migration Job, HPA, PDB
   overlays/dev/     DEPLOYED, automated sync. CI updates newTag here.
@@ -33,10 +36,13 @@ components/
                     rollout, restricted pod security, probes, zone spreading, HPA metric, PDB
   public-route/     opt-in: a path on the shared ALB
   postgres/         opt-in: a database and a login of its own, as DATABASE_* env vars
+tests/kyverno/      one folder per policy: a manifest it must reject, and one it must accept
 tests/golden-path-service/  never deployed; a sample service so `validate` checks every
                     change to components/ even when apps/ holds no golden-path service
 scripts/validate.sh render every overlay and every Helm chart an Application installs,
-                    schema-check the result (CI required check)
+                    schema-check the result, then run the policy tests (CI required check)
+scripts/policy-test.sh  Kyverno CLI: everything deployed passes the policies; each policy
+                    rejects its bad example
 ```
 
 No `kind: Secret` lives in this repo: ESO creates `feature-flag-secrets` at runtime from

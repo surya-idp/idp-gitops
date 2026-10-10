@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: x
+  namespace: some-service
+spec:
+  selector:
+    matchLabels:
+      app: some-service
+  template:
+    metadata:
+      labels:
+        app: some-service
+        app.kubernetes.io/name: some-service
+    spec:
+      securityContext:
+        runAsNonRoot: true
+      containers:
+        - name: app
+          image: 693906847772.dkr.ecr.ap-south-1.amazonaws.com/svc/some-service:1111111111111111111111111111111111111111
+          resources:
+            limits: {memory: 256Mi}
+          readinessProbe:
+            httpGet: {path: /health/ready, port: 8000}
+          livenessProbe:
+            httpGet: {path: /health/live, port: 8000}

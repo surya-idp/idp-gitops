@@ -1,0 +1,63 @@
+# Golden-path images must carry build provenance signed by the shared CI workflow.
+#
+# CI (surya-idp/idp-platform, python-service.yml v2) attests every image it pushes: a signed
+# statement that this digest was built by that workflow from a given commit. This policy checks
+# it at admission, which turns "we sign our images" into "an unsigned image does not run".
+#
+# What exactly is trusted: a certificate issued by Sigstore to a GitHub Actions run whose
+# workflow is the shared one. A service's own workflow file, a laptop, or another org cannot
+# obtain such a certificate, so they cannot produce an image this policy accepts.
+#
+# AUDIT for now, not Deny: storing GitHub attestations in ECR and reading them back here has
+# not run against a real cluster yet. In Audit, violations show up in policy reports
+# (kubectl get policyreport -A) without blocking a deploy. Switch to Deny after one clean
+# session. The two older apps (feature-flag-service, idp-portal) are not matched: their images
+# are not built by the attesting workflow yet.
+apiVersion: policies.kyverno.io/v1
+kind: ImageValidatingPolicy
+metadata:
+  name: verify-image-provenance
+spec:
+  validationActions: [Audit]
+  webhookConfiguration:
+    timeoutSeconds: 20          # registry + transparency-log round trips
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ['']
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  # Check, do not rewrite. The default would replace each tag by its digest in the pod spec; on a
+  # Deployment that is a change Argo CD would revert on every sync (Git says tag). Tags in our
+  # ECR are immutable, so a verified tag cannot later point at different content.
+  validationConfigurations:
+    mutateDigest: false
+    verifyDigest: false
+    required: true
+  matchImageReferences:
+    - glob: '693906847772.dkr.ecr.ap-south-1.amazonaws.com/svc/*'
+  # ECR needs authentication. `amazon` uses the admission controller's IAM role (IRSA,
+  # idp-kyverno: read-only on ECR svc/*). No pull secret exists anywhere.
+  credentials:
+    providers:
+      - amazon
+  attestors:
+    - name: sharedWorkflow
+      cosign:
+        keyless:
+          identities:
+            - issuer: https://token.actions.githubusercontent.com
+              # main, or a release tag of the shared workflow. Not a branch: anyone who can
+              # push a branch to idp-platform could otherwise sign with a modified workflow.
+              subjectRegExp: '^https://github\.com/surya-idp/idp-platform/\.github/workflows/python-service\.yml@refs/(heads/main|tags/v.*)$'
+        ctlog:
+          url: https://rekor.sigstore.dev
+  attestations:
+    - name: provenance
+      intoto:
+        type: https://slsa.dev/provenance/v1
+  validations:
+    - expression: >-
+        images.containers.map(image,
+          verifyAttestationSignatures(image, attestations.provenance, [attestors.sharedWorkflow])).all(e, e > 0)
+      message: "Image has no build provenance signed by surya-idp/idp-platform python-service.yml."
