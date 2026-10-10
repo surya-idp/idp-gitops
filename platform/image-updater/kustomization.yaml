@@ -1,0 +1,25 @@
+# Argo CD Image Updater v1.3.1: watches ECR for new images of golden-path services and commits
+# the new tag to this repo (apps/<name>/overlays/dev/kustomization.yaml) as idp-ci-bot.
+# Dev only. Upstream does not recommend it for critical production workloads; staging/prod
+# promotion is a separate decision (Kargo / GitOps Promoter, TEMPLATES_RESEARCH 11.2).
+#
+# Installed in the argocd namespace (upstream "Option 1"): namespace-scoped RBAC is enough
+# because ImageUpdater resources and Applications both live there.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: argocd
+resources:
+  # Pinned by commit (tags can move): 6032a80 = v1.3.1
+  - https://raw.githubusercontent.com/argoproj-labs/argocd-image-updater/6032a807ecf893734999a9f8eb514407b2707b28/config/install.yaml
+  - git-credentials.yaml
+  - imageupdater.yaml
+configMapGenerator:
+  - name: image-updater-ecr-login
+    files:
+      - ecr-login.sh
+generatorOptions:
+  disableNameSuffixHash: true
+patches:
+  - path: patch-config.yaml
+  - path: patch-serviceaccount.yaml
+  - path: patch-deployment.yaml

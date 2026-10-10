@@ -1,0 +1,19 @@
+# One ImageUpdater for every golden-path Application. The per-service settings (which image,
+# where to write) are annotations that the ApplicationSet puts on each Application
+# (platform/argocd-apps/golden-path-services.yaml); useAnnotations is the upstream-documented
+# way to drive ApplicationSet-generated apps without one ImageUpdater per service.
+apiVersion: argocd-image-updater.argoproj.io/v1alpha1
+kind: ImageUpdater
+metadata:
+  name: golden-path
+  annotations:
+    # The CRD is created in the same sync; skip the dry run until it exists.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  applicationRefs:
+    - namePattern: "*"
+      labelSelectors:
+        matchLabels:
+          idp.surya-idp/golden-path: "true"
+      useAnnotations: true

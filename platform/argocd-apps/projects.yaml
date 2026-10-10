@@ -3,7 +3,7 @@
 #
 #   default   locked: nothing may use it (Argo's default project allows any repo, any
 #             destination, any kind - a known escalation path).
-#   platform  cluster-wide config; only the cluster-scoped kinds it needs.
+#   platform  cluster-wide config and platform controllers; only the cluster-scoped kinds they need.
 #   apps      workloads: namespaced resources only, from idp-gitops only, never into system
 #             namespaces. Golden-path services get their own namespace (name unknown ahead
 #             of time), hence "*" minus the denied ones.
@@ -30,7 +30,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
 spec:
-  description: Cluster-wide platform config (ClusterSecretStore, PriorityClasses)
+  description: Cluster-wide platform config (ClusterSecretStore, PriorityClasses, Image Updater)
   sourceRepos:
     - https://github.com/surya-idp/idp-gitops
   destinations:
@@ -41,6 +41,13 @@ spec:
       kind: ClusterSecretStore
     - group: scheduling.k8s.io
       kind: PriorityClass
+    # Image Updater install (platform/image-updater): its CRD and the metrics RBAC.
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
