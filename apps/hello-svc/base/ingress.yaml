@@ -1,0 +1,16 @@
+# Which path goes to this service. How it is exposed comes from components/public-route.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hello-svc
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /hello-svc
+            pathType: Prefix
+            backend:
+              service:
+                name: hello-svc
+                port:
+                  name: http

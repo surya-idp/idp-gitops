@@ -1,0 +1,7 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: hello-svc
+spec:
+  selector:
+    matchLabels: {}   # filled in by `labels` in kustomization.yaml
