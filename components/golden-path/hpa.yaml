@@ -1,0 +1,15 @@
+# The service sets minReplicas/maxReplicas; the platform sets what it scales on.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: any
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"   # after the Deployment (Finding 41)
+spec:
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70

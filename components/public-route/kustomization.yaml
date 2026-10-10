@@ -1,0 +1,10 @@
+# Opt-in: a route on the shared internet-facing ALB. The service's Ingress says only which
+# path goes to which Service; this component adds how the platform exposes it.
+#   components:
+#     - ../../../components/public-route
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+patches:
+  - path: ingress.yaml
+    target:
+      kind: Ingress

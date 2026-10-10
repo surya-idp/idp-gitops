@@ -1,0 +1,17 @@
+# Joins the shared ALB (group idp): no new load balancer, no extra cost.
+# group.order 10 < feature-flag-api's catch-all (1000), so a service path is matched first.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: any
+  annotations:
+    alb.ingress.kubernetes.io/group.name: idp
+    alb.ingress.kubernetes.io/group.order: "10"
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    # The ALB checks the pod directly (target-type ip), so the path has no service prefix.
+    alb.ingress.kubernetes.io/healthcheck-path: /health/ready
+    alb.ingress.kubernetes.io/target-group-attributes: deregistration_delay.timeout_seconds=10
+spec:
+  ingressClassName: alb

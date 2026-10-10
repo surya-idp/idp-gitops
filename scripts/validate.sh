@@ -22,7 +22,8 @@ KC=(kubeconform -strict -summary -output text -kubernetes-version "$K8S_VERSION"
 fail=0
 rendered="$(mktemp)"
 # Deployable roots: overlays and standalone kustomizations (bases are covered via overlays).
-for dir in $(find apps platform -name kustomization.yaml -not -path '*/base/*' -printf '%h\n' | sort); do
+# tests/ holds a sample golden-path service, so a change to components/ is always exercised.
+for dir in $(find apps platform tests -name kustomization.yaml -not -path '*/base/*' -printf '%h\n' | sort); do
   echo "==> $dir"
   if ! kubectl kustomize "$dir" > "$rendered"; then fail=1; continue; fi
   ./scripts/crd-schemas.py "$LOCAL_SCHEMAS" < "$rendered"

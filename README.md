@@ -23,7 +23,14 @@ apps/feature-flag-service/
   overlays/prod/    Defined, not deployed. Manual sync when enabled. PDB minAvailable 2.
 apps/idp-portal/    Backstage (image from github.com/surya-idp/idp-portal CI)
 apps/<service>/     added by the Backstage python-service template (a PR that merges itself
-                    once `validate` is green); found by the ApplicationSet, no Application file
+                    once `validate` is green); found by the ApplicationSet, no Application file.
+                    Holds only what is specific to the service (name, image, port, env, sizes).
+components/
+  golden-path/      the platform's standard for those services, in one place: zero-downtime
+                    rollout, restricted pod security, probes, zone spreading, HPA metric, PDB
+  public-route/     opt-in: a path on the shared ALB
+tests/golden-path-service/  never deployed; a sample service so `validate` checks every
+                    change to components/ even when apps/ holds no golden-path service
 scripts/validate.sh render every overlay + schema-check it (CI required check)
 ```
 
