@@ -3,7 +3,8 @@
 # A service (apps/<name>/base) lists only what is its own: name, image, port, env, resource
 # sizes, replica bounds. This component adds everything the platform decides for all of them:
 # zero-downtime rollout settings, restricted pod security, probes, spreading, autoscaling
-# metric, disruption budget, and observability (metrics scraping, where traces go). Changing a file here changes every service on the next sync;
+# metric, disruption budget, observability (metrics scraping, where traces go), and a network
+# policy (only the load balancer, Prometheus and the same namespace may connect). Changing a file here changes every service on the next sync;
 # the `validate` check renders every service against the change before it can merge.
 #
 # Used from a service's base kustomization:
@@ -14,6 +15,8 @@
 # must be named `app` and listen on a port named `http`.
 apiVersion: kustomize.config.k8s.io/v1alpha1
 kind: Component
+resources:
+  - networkpolicy.yaml
 patches:
   - path: deployment.yaml
     target:

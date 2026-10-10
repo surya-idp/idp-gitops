@@ -1,0 +1,40 @@
+# Who may talk TO this service's pods. Default in Kubernetes: every pod in the cluster can
+# reach every other pod. This narrows it to the three callers a web service has:
+#
+#   1. the shared load balancer. With target-type `ip` the ALB connects straight to the pod
+#      from its own addresses, which live in the VPC's PUBLIC subnets (10.0.1.0/24,
+#      10.0.2.0/24). Pods and nodes are in the private subnets, so this range is the ALB and
+#      nothing else in the cluster.
+#   2. Prometheus, to scrape /metrics (namespace `monitoring`).
+#   3. pods of the same namespace (the service's own Jobs or sidecars).
+#
+# Not listed and still allowed: the kubelet's health probes (traffic from a pod's own node is
+# never filtered by the VPC CNI) and `kubectl port-forward`.
+#
+# Outbound traffic is not restricted: a service must reach its database, the cache, the trace
+# store and DNS, and an allow-list for those belongs to the service, not to a shared default.
+#
+# Enforced by the VPC CNI's network policy agent (idp-infra/30-cluster, enableNetworkPolicy).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-from-platform
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 10.0.1.0/24
+        - ipBlock:
+            cidr: 10.0.2.0/24
+      ports:
+        - port: 8000          # the `http` container port of every service on this platform
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: 8000          # the `http` container port of every service on this platform
+    - from:
+        - podSelector: {}

@@ -1,0 +1,10 @@
+# Nothing in the cluster may connect to Backstage (PLATFORM_REVIEW F13). It has no Ingress and
+# no in-cluster callers; you reach it with `kubectl port-forward`, which is not subject to
+# NetworkPolicy. Before this, any pod in any namespace could call its API.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-all-ingress
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
