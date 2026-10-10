@@ -36,8 +36,8 @@ spec:
     required: true
   matchImageReferences:
     - glob: '693906847772.dkr.ecr.ap-south-1.amazonaws.com/svc/*'
-  # ECR needs authentication. `amazon` uses the admission controller's IAM role (IRSA,
-  # idp-kyverno: read-only on ECR svc/*). No pull secret exists anywhere.
+  # ECR needs authentication. `amazon` uses the admission controller's IAM role (idp-kyverno,
+  # through EKS Pod Identity: read-only on ECR svc/*). No pull secret exists anywhere.
   credentials:
     providers:
       - amazon

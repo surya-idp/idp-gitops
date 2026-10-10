@@ -30,7 +30,8 @@ spec:
     spec:
       terminationGracePeriodSeconds: 40   # preStop 20s + graceful shutdown
       priorityClassName: business-critical
-      # The service's own ServiceAccount exists for identity (IRSA later); the app does not
+      # The service's own ServiceAccount exists for identity (an AWS role can be attached to
+      # it later with an EKS Pod Identity association); the app does not
       # call the Kubernetes API, so no token is mounted.
       automountServiceAccountToken: false
       # Pod Security "restricted" profile.

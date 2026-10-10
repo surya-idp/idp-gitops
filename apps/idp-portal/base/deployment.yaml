@@ -24,7 +24,7 @@ spec:
         app: idp-portal
         app.kubernetes.io/part-of: idp-platform
     spec:
-      # IRSA: role idp-portal (delete ECR svc/* only), for the decommission-service template.
+      # Gets the IAM role idp-portal (delete ECR svc/* only) through EKS Pod Identity.
       serviceAccountName: idp-portal
       securityContext:
         runAsNonRoot: true

@@ -21,5 +21,4 @@ generatorOptions:
   disableNameSuffixHash: true
 patches:
   - path: patch-config.yaml
-  - path: patch-serviceaccount.yaml
   - path: patch-deployment.yaml

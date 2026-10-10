@@ -1,4 +1,5 @@
-# Argo CD AppProjects (PLATFORM_REVIEW F4). Wave -1: projects exist before any child app.
+# Argo CD AppProjects (PLATFORM_REVIEW F4). Wave -3: projects exist before any child app
+# (the first ones, the platform controllers, are in waves -2 and -1).
 # The root app lives in project "bootstrap", created by idp-infra/40-platform together with it.
 #
 #   default   locked: nothing may use it (Argo's default project allows any repo, any
@@ -13,7 +14,7 @@ metadata:
   name: default
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "-1"
+    argocd.argoproj.io/sync-wave: "-3"
 spec:
   sourceRepos: []
   sourceNamespaces: []
@@ -28,7 +29,7 @@ metadata:
   name: platform
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "-1"
+    argocd.argoproj.io/sync-wave: "-3"
 spec:
   description: Cluster-wide platform config and controllers (secret store, priority classes, Image Updater, database operator, Kyverno and its policies, the monitoring stack)
   sourceRepos:
@@ -40,6 +41,8 @@ spec:
     - https://prometheus-community.github.io/helm-charts
     - https://grafana.github.io/helm-charts
     - https://grafana-community.github.io/helm-charts
+    - https://aws.github.io/eks-charts
+    - https://charts.external-secrets.io
   destinations:
     - server: https://kubernetes.default.svc
       namespace: "*"
@@ -58,6 +61,16 @@ spec:
     # Platform controllers get namespaces of their own (CreateNamespace=true).
     - group: ""
       kind: Namespace
+    # The AWS Load Balancer Controller and External Secrets charts: ingress class, admission
+    # webhooks.
+    - group: networking.k8s.io
+      kind: IngressClass
+    - group: elbv2.k8s.aws
+      kind: IngressClassParams
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
     # The admission policies themselves (platform/kyverno) are cluster-scoped.
     - group: policies.kyverno.io
       kind: ValidatingPolicy
@@ -70,7 +83,7 @@ metadata:
   name: apps
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "-1"
+    argocd.argoproj.io/sync-wave: "-3"
 spec:
   description: Application workloads (dev); one namespace per service
   sourceRepos:

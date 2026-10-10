@@ -1,7 +1,9 @@
 # idp-gitops
 
 GitOps source of truth for the IDP EKS cluster. Argo CD watches this repo; nothing is
-applied by hand.
+applied by hand. Terraform (idp-infra) installs Argo CD and nothing else: every controller
+and every app in the cluster comes from here. No file here names an IAM role: pods get AWS
+permissions through EKS Pod Identity associations in idp-infra.
 
 ```
 platform/
@@ -10,6 +12,8 @@ platform/
     platform-cluster.yaml   wave 0 -> platform/cluster
     feature-flag-dev.yaml   wave 1 -> apps/feature-flag-service/overlays/dev
     idp-portal.yaml         wave 1 -> apps/idp-portal/overlays/dev (Backstage, port-forward only)
+    projects.yaml           wave -3 -> AppProjects default (locked), platform, apps
+    platform-controllers.yaml  wave -2 AWS Load Balancer Controller, wave -1 External Secrets
     kyverno.yaml            wave 0 -> Helm chart kyverno + platform/kyverno (policies)
     monitoring-stack.yaml   wave 0 -> kube-prometheus-stack (Prometheus, Grafana, Alertmanager) + platform/monitoring
     monitoring-logs.yaml    wave 0 -> Loki (stores logs) and Alloy (collects them)
@@ -17,11 +21,11 @@ platform/
     db-operator.yaml        wave 0 -> Helm chart ext-postgres-operator + platform/db-operator
     image-updater.yaml      wave 1 -> platform/image-updater
     golden-path-services.yaml  ApplicationSet: one Application per apps/<name>/overlays/dev
-  cluster/          ClusterSecretStore (ESO -> AWS Secrets Manager, via IRSA), PriorityClass
+  cluster/          ClusterSecretStore (ESO -> AWS Secrets Manager), PriorityClass
   db-operator/      credentials for the database operator (the operator itself is a Helm chart,
                     see argocd-apps/db-operator.yaml). The only place the RDS master password lives.
   image-updater/    Argo CD Image Updater: new ECR image of a golden-path service -> commits
-                    newTag to its dev overlay as idp-ci-bot (ECR login via IRSA)
+                    newTag to its dev overlay as idp-ci-bot
   monitoring/       what the monitoring stack does for us: which pods are scraped (label
                     idp.surya-idp/metrics), alert rules, the alert receiver, Grafana's login and
                     the per-service dashboard. The stack is four charts: argocd-apps/monitoring-*.yaml
