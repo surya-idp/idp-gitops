@@ -3,7 +3,7 @@
 # A service (apps/<name>/base) lists only what is its own: name, image, port, env, resource
 # sizes, replica bounds. This component adds everything the platform decides for all of them:
 # zero-downtime rollout settings, restricted pod security, probes, spreading, autoscaling
-# metric, disruption budget. Changing a file here changes every service on the next sync;
+# metric, disruption budget, and observability (metrics scraping, where traces go). Changing a file here changes every service on the next sync;
 # the `validate` check renders every service against the change before it can merge.
 #
 # Used from a service's base kustomization:

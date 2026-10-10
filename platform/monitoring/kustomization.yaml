@@ -1,0 +1,31 @@
+# What the monitoring stack is told to do. The stack itself is four Helm charts
+# (platform/argocd-apps/monitoring-*.yaml); this folder is the platform's own configuration:
+#
+#   grafana-admin.yaml     Grafana's admin login, from Secrets Manager
+#   podmonitor.yaml        WHAT to scrape: every pod labelled idp.surya-idp/metrics: "true"
+#   rules.yaml             WHEN to alert (tested with promtool in CI: tests/prometheus)
+#   alert-receiver.yaml    WHERE alerts go: a receiver in the cluster that logs them
+#   dashboards/            the per-service dashboard, loaded by Grafana's sidecar
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: monitoring
+resources:
+  - grafana-admin.yaml
+  - podmonitor.yaml
+  - rules.yaml
+  - alert-receiver.yaml
+configMapGenerator:
+  - name: dashboard-service-overview
+    files:
+      - dashboards/service-overview.json
+    options:
+      labels:
+        grafana_dashboard: "1"          # the Grafana sidecar loads ConfigMaps with this label
+  - name: alert-receiver
+    files:
+      - receiver.py
+generatorOptions:
+  disableNameSuffixHash: true
+commonAnnotations:
+  # The monitoring.coreos.com CRDs come from the chart in the same sync.
+  argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true

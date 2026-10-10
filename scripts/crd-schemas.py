@@ -11,7 +11,7 @@ import json
 import pathlib
 import sys
 
-import yaml
+import yamlsafe
 
 
 def strict(node):
@@ -28,7 +28,7 @@ def strict(node):
 
 
 out = pathlib.Path(sys.argv[1])
-for doc in yaml.safe_load_all(sys.stdin):
+for doc in yamlsafe.load_all(sys.stdin):
     if not doc or doc.get("kind") != "CustomResourceDefinition":
         continue
     group, kind = doc["spec"]["group"], doc["spec"]["names"]["kind"].lower()

@@ -1,0 +1,140 @@
+# App-of-apps child: metrics, dashboards and alerts (Step 34, PLATFORM_REVIEW F14).
+#
+# kube-prometheus-stack = Prometheus Operator + Prometheus + Alertmanager + Grafana +
+# kube-state-metrics + node-exporter, wired together. Sized for small nodes: one replica of
+# each, 6 hours of metrics kept in memory-backed storage (a session is shorter than that, and
+# nothing here survives `make down` anyway).
+#
+# What it gives:
+#   - Prometheus scrapes every pod labelled idp.surya-idp/metrics: "true" (platform/monitoring)
+#   - Grafana with Prometheus, Loki (logs) and Tempo (traces) as data sources and a
+#     per-service dashboard
+#   - Alertmanager sends alerts to a small receiver in the cluster that logs them
+#
+# Second source: platform/monitoring (what to scrape, alert rules, dashboards, receiver).
+# Wave 0: with the other platform controllers; the namespace `monitoring` is excluded from the
+# admission policies (its images come from upstream registries).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring-stack
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  sources:
+    - repoURL: https://prometheus-community.github.io/helm-charts
+      chart: kube-prometheus-stack
+      targetRevision: 91.7.0          # Prometheus Operator v0.94.1
+      helm:
+        releaseName: kps
+        valuesObject:
+          fullnameOverride: kps
+          # The EKS control plane is managed by AWS: these components cannot be scraped,
+          # and their targets and alerts would be permanently "down".
+          kubeEtcd: {enabled: false}
+          kubeScheduler: {enabled: false}
+          kubeControllerManager: {enabled: false}
+          kubeProxy: {enabled: false}
+          defaultRules:
+            rules:
+              etcd: false
+              kubeSchedulerAlerting: false
+              kubeSchedulerRecording: false
+              kubeControllerManager: false
+              kubeProxy: false
+          prometheusOperator:
+            # No admission webhook: it needs certificate jobs that run as Helm hooks, and the
+            # rules in this repo are checked by promtool in CI instead.
+            admissionWebhooks:
+              enabled: false
+            tls:
+              enabled: false
+            resources:
+              requests: {cpu: 20m, memory: 48Mi}
+              limits: {memory: 128Mi}
+          prometheus:
+            prometheusSpec:
+              replicas: 1
+              retention: 6h
+              # Pick up every PodMonitor / ServiceMonitor / PrometheusRule in the cluster, not
+              # only the ones labelled with this Helm release.
+              podMonitorSelectorNilUsesHelmValues: false
+              serviceMonitorSelectorNilUsesHelmValues: false
+              ruleSelectorNilUsesHelmValues: false
+              resources:
+                requests: {cpu: 50m, memory: 300Mi}
+                limits: {memory: 700Mi}
+          alertmanager:
+            alertmanagerSpec:
+              replicas: 1
+              resources:
+                requests: {cpu: 10m, memory: 32Mi}
+                limits: {memory: 96Mi}
+            config:
+              route:
+                receiver: alert-log
+                group_by: [alertname, namespace]
+                group_wait: 10s
+                group_interval: 1m
+                repeat_interval: 1h
+              receivers:
+                # A webhook receiver inside the cluster that writes each alert to its log
+                # (platform/monitoring/alert-receiver.yaml). The delivery path is the real one;
+                # only the destination is local, so no chat token has to be stored.
+                - name: alert-log
+                  webhook_configs:
+                    - url: http://alert-receiver.monitoring.svc:8080/
+                      send_resolved: true
+          grafana:
+            # Login: admin + the generated password in Secrets Manager idp/grafana-admin
+            # (ExternalSecret in platform/monitoring). Port-forward only, like Argo CD.
+            admin:
+              existingSecret: grafana-admin
+              userKey: admin-user
+              passwordKey: admin-password
+            resources:
+              requests: {cpu: 20m, memory: 100Mi}
+              limits: {memory: 256Mi}
+            additionalDataSources:
+              - name: Loki
+                type: loki
+                uid: loki
+                access: proxy
+                url: http://loki.monitoring.svc:3100
+                jsonData:
+                  # A trace id in a log line becomes a link to the trace in Tempo.
+                  derivedFields:
+                    - name: trace
+                      matcherRegex: '"trace_id": "(\w+)"'
+                      datasourceUid: tempo
+                      url: '$${__value.raw}'
+              - name: Tempo
+                type: tempo
+                uid: tempo
+                access: proxy
+                url: http://tempo.monitoring.svc:3200
+          kube-state-metrics:
+            resources:
+              requests: {cpu: 10m, memory: 32Mi}
+              limits: {memory: 96Mi}
+          prometheus-node-exporter:
+            resources:
+              requests: {cpu: 10m, memory: 16Mi}
+              limits: {memory: 48Mi}
+    - repoURL: https://github.com/surya-idp/idp-gitops
+      targetRevision: HEAD
+      path: platform/monitoring
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true          # the Prometheus Operator CRDs are too large for client-side apply

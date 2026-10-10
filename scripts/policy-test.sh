@@ -26,7 +26,9 @@ while read -r release namespace repo chart version values; do
   helm template "$release" "$chart" --repo "$repo" --version "$version" --namespace "$namespace" \
     --include-crds --values "$values" 2>/dev/null | python3 -c "
 import sys, yaml
-for i, doc in enumerate(d for d in yaml.safe_load_all(sys.stdin) if d and d.get('kind') == 'CustomResourceDefinition'):
+sys.path.insert(0, 'scripts')
+import yamlsafe
+for i, doc in enumerate(d for d in yamlsafe.load_all(sys.stdin) if d and d.get('kind') == 'CustomResourceDefinition'):
     if doc['spec']['group'] == 'db.movetokube.com':
         open(f'$work/crds/{doc[\"metadata\"][\"name\"]}.yaml', 'w').write(yaml.safe_dump(doc))
 "

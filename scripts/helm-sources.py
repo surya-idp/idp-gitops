@@ -11,11 +11,11 @@ import pathlib
 import sys
 import tempfile
 
-import yaml
+import yamlsafe
 
 out_dir = pathlib.Path(tempfile.mkdtemp(prefix="helm-values-"))
 for path in sorted(pathlib.Path(sys.argv[1]).glob("*.yaml")):
-    for doc in yaml.safe_load_all(path.read_text()):
+    for doc in yamlsafe.load_all(path.read_text()):
         if not doc or doc.get("kind") != "Application":
             continue
         spec = doc["spec"]
