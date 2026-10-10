@@ -1,0 +1,69 @@
+# Every golden-path service, discovered from Git: a directory apps/<name>/overlays/dev becomes
+# an Argo CD Application <name> in namespace <name>. The Backstage template only adds that
+# directory (through a PR); it never writes an Application.
+#
+# project is hard-coded: with a templated project, anyone who can write to this repo could
+# create an Application in a less restricted project (Argo CD ApplicationSet security docs).
+#
+# The annotations are read by Argo CD Image Updater (platform/image-updater): every new image
+# pushed to ECR svc/<name> is written back to that overlay's kustomization.yaml (newTag), so
+# pushes after the first one deploy with no human step (TEMPLATES_RESEARCH Finding 55).
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: golden-path-services
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: https://github.com/surya-idp/idp-gitops
+        revision: HEAD
+        directories:
+          - path: apps/*/overlays/dev
+          # These two predate the golden path and keep their own Application files
+          # (different names/namespaces; CI commits their tags).
+          - path: apps/feature-flag-service/overlays/dev
+            exclude: true
+          - path: apps/idp-portal/overlays/dev
+            exclude: true
+  template:
+    metadata:
+      name: '{{ index .path.segments 1 }}'
+      labels:
+        idp.surya-idp/golden-path: "true"
+      annotations:
+        argocd-image-updater.argoproj.io/image-list: 'app=693906847772.dkr.ecr.ap-south-1.amazonaws.com/svc/{{ index .path.segments 1 }}'
+        argocd-image-updater.argoproj.io/app.update-strategy: newest-build
+        # CI tags images with the full commit SHA only.
+        argocd-image-updater.argoproj.io/app.allow-tags: 'regexp:^[0-9a-f]{40}$'
+        argocd-image-updater.argoproj.io/write-back-method: git:secret:argocd/image-updater-git
+        argocd-image-updater.argoproj.io/write-back-target: kustomization
+        argocd-image-updater.argoproj.io/git-branch: main
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io   # make down: removes the Ingress -> ALB rule
+    spec:
+      project: apps
+      source:
+        repoURL: https://github.com/surya-idp/idp-gitops
+        targetRevision: HEAD
+        path: '{{ .path.path }}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{ index .path.segments 1 }}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+        managedNamespaceMetadata:
+          labels:
+            # Pod Security Admission: enforce baseline, warn+audit restricted (projects.yaml)
+            pod-security.kubernetes.io/enforce: baseline
+            pod-security.kubernetes.io/warn: restricted
+            pod-security.kubernetes.io/audit: restricted
+            elbv2.k8s.aws/pod-readiness-gate-inject: enabled

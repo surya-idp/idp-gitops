@@ -1,0 +1,26 @@
+# App-of-apps child: Argo CD Image Updater (platform/image-updater). Wave 1: its ExternalSecret
+# needs the ClusterSecretStore from platform-cluster (wave 0).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: image-updater
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/surya-idp/idp-gitops
+    targetRevision: HEAD
+    path: platform/image-updater
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true   # the CRD is larger than the client-side apply annotation limit

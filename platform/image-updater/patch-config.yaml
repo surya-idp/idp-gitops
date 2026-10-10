@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-image-updater-config
+data:
+  log.level: info
+  # How often ECR is checked. A new image deploys within this + Argo CD's own poll (3 min).
+  interval: 1m
+  git.commit-message-template: |
+    chore(deploy): update {{ .AppName }} image{{ range .AppChanges }} to {{ .NewTag }}{{ end }}
+  registries.conf: |
+    registries:
+      - name: ECR
+        prefix: 693906847772.dkr.ecr.ap-south-1.amazonaws.com
+        api_url: https://693906847772.dkr.ecr.ap-south-1.amazonaws.com
+        credentials: ext:/app/scripts/ecr-login.sh
+        credsexpire: 10h

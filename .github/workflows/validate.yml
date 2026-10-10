@@ -27,5 +27,7 @@ jobs:
           curl -sSfL -o kc.tgz "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz"
           echo "${KUBECONFORM_SHA256}  kc.tgz" | sha256sum -c -
           tar xzf kc.tgz kubeconform && sudo mv kubeconform /usr/local/bin/
+      - name: PyYAML for scripts/crd-schemas.py
+        run: python3 -c 'import yaml' || pip install --user pyyaml==6.0.2
       - name: Render and validate
         run: ./scripts/validate.sh
