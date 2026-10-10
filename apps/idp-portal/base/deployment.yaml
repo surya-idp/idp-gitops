@@ -24,6 +24,8 @@ spec:
         app: idp-portal
         app.kubernetes.io/part-of: idp-platform
     spec:
+      # IRSA: role idp-portal (delete ECR svc/* only), for the decommission-service template.
+      serviceAccountName: idp-portal
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000          # "node" user in the node:24 base image
