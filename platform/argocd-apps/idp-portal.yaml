@@ -10,7 +10,7 @@ metadata:
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
-  project: default
+  project: apps
   source:
     repoURL: https://github.com/surya-idp/idp-gitops
     targetRevision: HEAD
@@ -24,3 +24,10 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+    managedNamespaceMetadata:
+      labels:
+        # Pod Security Admission (PLATFORM_REVIEW F5): enforce baseline now, report restricted
+        # violations (warn on apply, audit log) before tightening enforce to restricted.
+        pod-security.kubernetes.io/enforce: baseline
+        pod-security.kubernetes.io/warn: restricted
+        pod-security.kubernetes.io/audit: restricted

@@ -14,7 +14,7 @@ metadata:
   finalizers:
     - resources-finalizer.argocd.argoproj.io   # make down: deleting the app removes the Ingress -> ALB
 spec:
-  project: default
+  project: apps
   source:
     repoURL: https://github.com/surya-idp/idp-gitops
     targetRevision: HEAD
@@ -34,6 +34,11 @@ spec:
       - CreateNamespace=true
     managedNamespaceMetadata:
       labels:
+        # Pod Security Admission (PLATFORM_REVIEW F5): enforce baseline now, report restricted
+        # violations (warn on apply, audit log) before tightening enforce to restricted.
+        pod-security.kubernetes.io/enforce: baseline
+        pod-security.kubernetes.io/warn: restricted
+        pod-security.kubernetes.io/audit: restricted
         app.kubernetes.io/part-of: feature-flag-service
         environment: dev
         # ALB controller injects a readiness gate into pods in this namespace: a pod is

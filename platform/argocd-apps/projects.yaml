@@ -1,0 +1,77 @@
+# Argo CD AppProjects (PLATFORM_REVIEW F4). Wave -1: projects exist before any child app.
+# The root app lives in project "bootstrap", created by idp-infra/40-platform together with it.
+#
+#   default   locked: nothing may use it (Argo's default project allows any repo, any
+#             destination, any kind - a known escalation path).
+#   platform  cluster-wide config; only the cluster-scoped kinds it needs.
+#   apps      workloads: namespaced resources only, from idp-gitops only, never into system
+#             namespaces. Golden-path services get their own namespace (name unknown ahead
+#             of time), hence "*" minus the denied ones.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: default
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  sourceRepos: []
+  sourceNamespaces: []
+  destinations: []
+  namespaceResourceBlacklist:
+    - group: "*"
+      kind: "*"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  description: Cluster-wide platform config (ClusterSecretStore, PriorityClasses)
+  sourceRepos:
+    - https://github.com/surya-idp/idp-gitops
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: "*"
+  clusterResourceWhitelist:
+    - group: external-secrets.io
+      kind: ClusterSecretStore
+    - group: scheduling.k8s.io
+      kind: PriorityClass
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: apps
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  description: Application workloads (dev); one namespace per service
+  sourceRepos:
+    - https://github.com/surya-idp/idp-gitops
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: "!kube-*"
+    - server: https://kubernetes.default.svc
+      namespace: "!argocd"
+    - server: https://kubernetes.default.svc
+      namespace: "!external-secrets"
+    - server: https://kubernetes.default.svc
+      namespace: "!default"
+    - server: https://kubernetes.default.svc
+      namespace: "*"
+  # Namespace: CreateNamespace=true + managedNamespaceMetadata (verify at next make up
+  # whether Argo needs this whitelisted; remove it if not).
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+  # Quotas/limits are set by the platform, not by the workload.
+  namespaceResourceBlacklist:
+    - group: ""
+      kind: ResourceQuota
+    - group: ""
+      kind: LimitRange
