@@ -90,10 +90,12 @@ spec:
                 # replaces the default list, so that route pointed at nothing and the operator
                 # refused the whole configuration (Alertmanager never started, 2026-10-11).
                 routes:
-                  # Watchdog fires all the time by design (it proves the alert path is alive).
+                  # Watchdog fires all the time by design (it proves the alert path is alive);
+                  # InfoInhibitor fires whenever an info-level alert does (it exists only to
+                  # mute those). Neither is news.
                   - receiver: "null"
                     matchers:
-                      - alertname = "Watchdog"
+                      - alertname =~ "Watchdog|InfoInhibitor"
               receivers:
                 - name: "null"
                 # A webhook receiver inside the cluster that writes each alert to its log
