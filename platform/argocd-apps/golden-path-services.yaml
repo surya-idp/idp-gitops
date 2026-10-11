@@ -58,12 +58,6 @@ spec:
         automated:
           prune: true
           selfHeal: true
-        syncOptions:
-          - CreateNamespace=true
-        managedNamespaceMetadata:
-          labels:
-            # Pod Security Admission: enforce baseline, warn+audit restricted (projects.yaml)
-            pod-security.kubernetes.io/enforce: baseline
-            pod-security.kubernetes.io/warn: restricted
-            pod-security.kubernetes.io/audit: restricted
-            elbv2.k8s.aws/pod-readiness-gate-inject: enabled
+        # No CreateNamespace: the namespace is a resource of the service itself
+        # (components/golden-path/namespace.yaml), so it carries its own labels and is removed
+        # with the service.

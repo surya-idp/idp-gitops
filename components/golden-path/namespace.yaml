@@ -1,0 +1,26 @@
+# The service's namespace, declared like everything else it owns.
+#
+# The name here is a placeholder: the service's overlay sets `namespace: <service>`, and
+# Kustomize renames a Namespace resource to match it.
+#
+# Why not let Argo CD create it (CreateNamespace=true)? A namespace Argo CD creates that way is
+# not part of the application, so removing the service left an empty namespace behind (seen in
+# session A, 2026-10-11). Declared here, it is deleted with the service.
+#
+# Wave -3 = created first and, because Argo CD deletes in reverse wave order, deleted LAST.
+# That order matters: deleting a namespace deletes everything inside at once, and the database
+# operator only drops a service's login if its database is not already being deleted
+# (components/postgres).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: set-by-overlay
+  annotations:
+    argocd.argoproj.io/sync-wave: "-3"
+  labels:
+    # Pod security: reject pods below "baseline", warn and audit against "restricted".
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/audit: restricted
+    # The load balancer controller holds a new pod out of rotation until its target is healthy.
+    elbv2.k8s.aws/pod-readiness-gate-inject: enabled
