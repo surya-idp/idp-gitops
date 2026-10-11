@@ -15,6 +15,7 @@ resources:
 components:
   - ../../../components/golden-path
   - ../../../components/public-route
+  - ../../../components/postgres
 labels:
   # On every resource, pod template and selector.
   - pairs:
