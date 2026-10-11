@@ -45,8 +45,18 @@ spec:
             # Keep V8's heap under the container limit so Node GCs instead of being OOM-killed.
             - name: NODE_OPTIONS
               value: "--max-old-space-size=768"
+            # "Add a feature flag" (scaffolder action idp:flags:create) calls the flag API as
+            # this pod's ServiceAccount, with the token mounted below.
+            - name: FLAG_API_URL
+              value: http://feature-flag-api.feature-flag-dev.svc:8000
+            - name: FLAG_API_TOKEN_FILE
+              value: /var/run/secrets/idp/flag-api/token
           securityContext:
             allowPrivilegeEscalation: false
+          volumeMounts:
+            - name: flag-api-token
+              mountPath: /var/run/secrets/idp/flag-api
+              readOnly: true
           # First start runs catalog/scaffolder DB migrations; allow up to 5 minutes.
           startupProbe:
             httpGet: {path: /.backstage/health/v1/liveness, port: 7007}
@@ -65,3 +75,14 @@ spec:
               memory: 512Mi
             limits:
               memory: 1Gi
+      volumes:
+        # A short-lived token valid for one audience, the flag API (same mechanism as
+        # components/golden-path/deployment.yaml). The flag API lists this ServiceAccount as
+        # an admin, so Backstage may create flags.
+        - name: flag-api-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  audience: feature-flag-api
+                  expirationSeconds: 3600
+                  path: token

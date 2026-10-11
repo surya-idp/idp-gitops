@@ -57,6 +57,8 @@ spec:
         # Prometheus scrapes /metrics on port `http` (platform/monitoring/podmonitor.yaml).
         idp.surya-idp/metrics: "true"
     spec:
+      # Its token is used for TokenReview only (serviceaccount.yaml).
+      serviceAccountName: feature-flag-api
       terminationGracePeriodSeconds: 40   # preStop 20s + uvicorn graceful shutdown
       # platform/cluster/priorityclasses.yaml: preempted after non-critical platform pods.
       priorityClassName: business-critical
@@ -111,6 +113,12 @@ spec:
               value: "30"
             - name: CACHE_TTL_SECONDS
               value: "10"
+            # Callers inside the cluster authenticate with their Kubernetes ServiceAccount token
+            # (feature-flag-service app/kube_identity.py). Any ServiceAccount may read and
+            # evaluate flags; only the ones listed here may create or change them. Backstage
+            # is listed because its "Add a feature flag" template creates flags.
+            - name: KUBE_ADMIN_SERVICEACCOUNTS
+              value: system:serviceaccount:backstage:idp-portal
             # REDIS_URL comes from the ESO-synced Secret (envFrom above): the Valkey
             # endpoint hash changes every time the cluster layer is recreated.
 

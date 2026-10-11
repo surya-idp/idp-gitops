@@ -60,6 +60,12 @@ spec:
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: http://tempo.monitoring.svc:4318
             # The name traces are filed under: the service label of the pod.
+            # Feature flags (templates/python-service: app/flags.py). The service proves who it
+            # is to the flag API with the token mounted below; there is no password or key.
+            - name: FLAG_API_URL
+              value: http://feature-flag-api.feature-flag-dev.svc:8000
+            - name: FLAG_API_TOKEN_FILE
+              value: /var/run/secrets/idp/flag-api/token
             - name: OTEL_SERVICE_NAME
               valueFrom:
                 fieldRef:
@@ -92,8 +98,22 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            - name: flag-api-token
+              mountPath: /var/run/secrets/idp/flag-api
+              readOnly: true
       volumes:
         # The only writable path (the root filesystem is read-only).
         - name: tmp
           emptyDir:
             sizeLimit: 64Mi
+        # A short-lived token from Kubernetes that says "I am this service's ServiceAccount" and
+        # is valid for ONE audience, the flag API. Kubernetes renews the file before it
+        # expires. The pod's general API token stays unmounted (automountServiceAccountToken:
+        # false above): this token is useless against the Kubernetes API or any other service.
+        - name: flag-api-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  audience: feature-flag-api
+                  expirationSeconds: 3600
+                  path: token

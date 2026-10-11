@@ -24,3 +24,6 @@ metadata:
     pod-security.kubernetes.io/audit: restricted
     # The load balancer controller holds a new pod out of rotation until its target is healthy.
     elbv2.k8s.aws/pod-readiness-gate-inject: enabled
+    # Marks a golden-path service's namespace. Platform services use it to say "any workload
+    # service may call me" in a NetworkPolicy (the flag API does).
+    idp.surya-idp/golden-path: "true"

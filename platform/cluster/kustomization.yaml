@@ -4,3 +4,4 @@ kind: Kustomization
 resources:
   - cluster-secret-store.yaml
   - priorityclasses.yaml
+  - flag-api-token-review.yaml

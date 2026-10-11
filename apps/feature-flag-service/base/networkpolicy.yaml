@@ -1,6 +1,6 @@
 # Who may talk TO the flag API's pods (PLATFORM_REVIEW F13). Same rule as golden-path services
 # (components/golden-path/networkpolicy.yaml explains each line): the shared load balancer
-# (public subnets), Prometheus, and pods of this namespace (the migration Job).
+# (public subnets), Prometheus, pods of this namespace (the migration Job), and its callers.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -22,5 +22,17 @@ spec:
               kubernetes.io/metadata.name: monitoring
       ports:
         - port: 8000          # the `http` container port of every service on this platform
+    # Its callers inside the cluster: every golden-path service (they evaluate flags) and
+    # Backstage (its template creates flags). Being able to connect is not being allowed in:
+    # each request still needs a valid ServiceAccount token.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              idp.surya-idp/golden-path: "true"
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: backstage
+      ports:
+        - port: 8000
     - from:
         - podSelector: {}
