@@ -99,8 +99,9 @@ spec:
       namespace: "!default"
     - server: https://kubernetes.default.svc
       namespace: "*"
-  # Namespace: CreateNamespace=true + managedNamespaceMetadata (verify at next make up
-  # whether Argo needs this whitelisted; remove it if not).
+  # The one cluster-wide kind a service may own: its namespace (components/golden-path).
+  # Kustomize names it after the overlay's `namespace:`, and validate.sh checks that a service
+  # renders at most one Namespace, named like its folder (scripts/namespace-check.py).
   clusterResourceWhitelist:
     - group: ""
       kind: Namespace

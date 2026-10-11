@@ -41,6 +41,7 @@ done < <(./scripts/helm-sources.py platform/argocd-apps)
 for dir in $(find apps platform tests -name kustomization.yaml -not -path '*/base/*' -printf '%h\n' | sort); do
   echo "==> $dir"
   if ! kubectl kustomize "$dir" > "$rendered"; then fail=1; continue; fi
+  ./scripts/namespace-check.py "$dir" < "$rendered" || fail=1
   ./scripts/crd-schemas.py "$LOCAL_SCHEMAS" < "$rendered"
   "${KC[@]}" - < "$rendered" || fail=1
 done

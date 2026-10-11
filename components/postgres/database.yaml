@@ -3,7 +3,12 @@ kind: Postgres
 metadata:
   name: database
   annotations:
-    argocd.argoproj.io/sync-wave: "0"
+    # Waves: database -2, login -1, everything else 0. Argo CD creates in that order and
+    # deletes in the reverse: the Deployment first (connections close), then the login, then
+    # the database. The operator drops a login's role only while its database still exists and
+    # is not being deleted; removed together, the role stayed behind on the shared instance
+    # (session A, 2026-10-11).
+    argocd.argoproj.io/sync-wave: "-2"
 spec:
   database: set-from-deployment-name
   # Data in this lab does not outlive a session anyway; a removed service must not leave a
@@ -15,7 +20,7 @@ kind: PostgresUser
 metadata:
   name: credentials
   annotations:
-    argocd.argoproj.io/sync-wave: "0"
+    argocd.argoproj.io/sync-wave: "-1"
 spec:
   role: set-from-deployment-name
   database: database          # the Postgres resource above
