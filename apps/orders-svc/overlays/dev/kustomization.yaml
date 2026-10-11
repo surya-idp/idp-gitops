@@ -1,0 +1,11 @@
+# First deploy is pinned to the repo's initial commit, which that repo's CI builds and pushes.
+# After that, Argo CD Image Updater rewrites newTag on every new image (commits by idp-ci-bot).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: orders-svc
+resources:
+  - ../../base
+images:
+  - name: 693906847772.dkr.ecr.ap-south-1.amazonaws.com/svc/orders-svc
+    # Quoted: a commit SHA made only of digits would otherwise be read as a number.
+    newTag: "9e1ca12e1b7cee06bf88089b8f53adcce27d1c21"
