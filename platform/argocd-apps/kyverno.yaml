@@ -46,6 +46,13 @@ spec:
           cleanupController:
             enabled: false
           features:
+            # How often existing resources are re-checked and their policy reports written.
+            # Enforcement happens at admission and does not depend on this; the reports are
+            # how a person SEES the result (kubectl get policyreport). With the default of 1h,
+            # a new service had no report 50 minutes after it was created (session B,
+            # 2026-10-11), although its image had been verified at admission.
+            backgroundScan:
+              backgroundScanInterval: 10m
             forceFailurePolicyIgnore:
               enabled: true
           # Helm hooks that Argo CD would not run the way Helm does.
