@@ -7,4 +7,4 @@ resources:
   - ../../base
 images:
   - name: 693906847772.dkr.ecr.ap-south-1.amazonaws.com/svc/orders-svc
-    newTag: 1bbf7aff8a7dbc00c8d5e65b9fb2400603f1800b
+    newTag: 345e1497819a5f8c1db56884d28a447829775900
