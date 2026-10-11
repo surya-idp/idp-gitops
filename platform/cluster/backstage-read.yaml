@@ -1,0 +1,45 @@
+# What Backstage may see in the cluster, for the Kubernetes tab of a service (idp-portal
+# app-config.production.yaml, `kubernetes:`). Read-only, and only the kinds that tab shows.
+#
+# Not included on purpose: Secrets (never), and anything that changes state. `pods/log` lets a
+# developer read a pod's log from the portal, the same lines that are already in Loki.
+#
+# Cluster-wide because services live in one namespace each and new ones appear without
+# anyone editing this file.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: backstage-read
+rules:
+  - apiGroups: [""]
+    resources: [pods, pods/log, services, configmaps, limitranges, resourcequotas]
+    verbs: [get, list, watch]
+  - apiGroups: [apps]
+    resources: [deployments, replicasets, statefulsets, daemonsets]
+    verbs: [get, list, watch]
+  - apiGroups: [batch]
+    resources: [jobs, cronjobs]
+    verbs: [get, list, watch]
+  - apiGroups: [autoscaling]
+    resources: [horizontalpodautoscalers]
+    verbs: [get, list, watch]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses]
+    verbs: [get, list, watch]
+  # CPU and memory per pod, shown next to each pod.
+  - apiGroups: [metrics.k8s.io]
+    resources: [pods]
+    verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: backstage-read
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: backstage-read
+subjects:
+  - kind: ServiceAccount
+    name: idp-portal
+    namespace: backstage
