@@ -1,0 +1,28 @@
+# Only what is specific to this service. Everything else (rollout strategy, security context,
+# probes, preStop, spreading) is added by components/golden-path.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notes-svc
+spec:
+  selector:
+    matchLabels: {}   # filled in by `labels` in kustomization.yaml
+  template:
+    spec:
+      serviceAccountName: notes-svc
+      containers:
+        - name: app
+          image: 693906847772.dkr.ecr.ap-south-1.amazonaws.com/svc/notes-svc:set-by-overlay
+          ports:
+            - containerPort: 8000
+              name: http
+          # Settings read by app/config.py. Add yours here.
+          env:
+            - name: LOG_LEVEL
+              value: INFO
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi

@@ -1,0 +1,16 @@
+# Which path goes to this service. How it is exposed comes from components/public-route.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: notes-svc
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /notes-svc
+            pathType: Prefix
+            backend:
+              service:
+                name: notes-svc
+                port:
+                  name: http
