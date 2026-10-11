@@ -55,7 +55,8 @@ spec:
               # On every idp-platform release, add its commit to this list.
               #   291df7b9774aca418fe913830c018e35089739ac = v2.0.0
               #   48676e8ff8f08d7aeeee11700ad7f0285d58ffe6 = v2.1.0
-              subjectRegExp: '^https://github\.com/surya-idp/idp-platform/\.github/workflows/python-service\.yml@(refs/heads/main|refs/tags/v.*|291df7b9774aca418fe913830c018e35089739ac|48676e8ff8f08d7aeeee11700ad7f0285d58ffe6)$'
+              #   3d15dbfbf73ecf7df2ab8e72238bc4c4f1e6bf3c = v2.1.1
+              subjectRegExp: '^https://github\.com/surya-idp/idp-platform/\.github/workflows/python-service\.yml@(refs/heads/main|refs/tags/v.*|291df7b9774aca418fe913830c018e35089739ac|48676e8ff8f08d7aeeee11700ad7f0285d58ffe6|3d15dbfbf73ecf7df2ab8e72238bc4c4f1e6bf3c)$'
         ctlog:
           url: https://rekor.sigstore.dev
   attestations:
