@@ -26,6 +26,20 @@ spec:
             summary: "{{ $labels.service }} has no scrapeable pods"
             description: "No pod of {{ $labels.service }} in {{ $labels.namespace }} answered /metrics for 2 minutes."
 
+        - alert: NoPodsAvailable
+          # ServiceDown cannot see a service with no pods at all: with nothing to scrape there
+          # is no `up` series, and "no data" is not "== 0" (seen on the cluster, 2026-10-11).
+          # kube-state-metrics reports the Deployment itself, so this covers zero replicas,
+          # a crash loop and an image that cannot be pulled.
+          expr: |
+            sum by (namespace, deployment) (kube_deployment_status_replicas_available{namespace!~"kube-system|argocd|kyverno|external-secrets|db-operator|monitoring"}) == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "{{ $labels.namespace }}/{{ $labels.deployment }} has no available pods"
+            description: "Deployment {{ $labels.deployment }} in {{ $labels.namespace }} has had zero ready pods for 2 minutes. kubectl -n {{ $labels.namespace }} get pods"
+
         - alert: HighErrorRate
           # Share of responses that are 5xx (the service's fault; 4xx is the caller's).
           expr: |
@@ -55,8 +69,11 @@ spec:
 
         - alert: PodRestarting
           # From kube-state-metrics, so it also covers services that export no metrics.
+          # `sum by` keeps only the labels that describe the pod. Without it the alert carries
+          # the scrape's own labels, e.g. service="kps-kube-state-metrics" (the exporter), which
+          # reads as if that were the failing service.
           expr: |
-            increase(kube_pod_container_status_restarts_total{namespace!~"kube-system|argocd|kyverno|external-secrets|db-operator|monitoring"}[15m]) > 2
+            sum by (namespace, pod, container) (increase(kube_pod_container_status_restarts_total{namespace!~"kube-system|argocd|kyverno|external-secrets|db-operator|monitoring"}[15m])) > 2
           for: 1m
           labels:
             severity: warning

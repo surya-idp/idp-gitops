@@ -108,7 +108,7 @@ tests:
   # ---- crash loop in a workload namespace; the same in a platform namespace is ignored ----
   - interval: 1m
     input_series:
-      - series: 'kube_pod_container_status_restarts_total{namespace="shop", pod="shop-1", container="app"}'
+      - series: 'kube_pod_container_status_restarts_total{namespace="shop", pod="shop-1", container="app", service="kps-kube-state-metrics", job="kube-state-metrics"}'
         values: '0+1x20'
       - series: 'kube_pod_container_status_restarts_total{namespace="monitoring", pod="loki-0", container="loki"}'
         values: '0+1x20'
@@ -120,3 +120,26 @@ tests:
             exp_annotations:
               summary: "shop/shop-1 restarted more than twice in 15 minutes"
               description: "Container app keeps restarting. kubectl -n shop logs shop-1 --previous"
+
+  # ---- a Deployment with no ready pods: nothing to scrape, so ServiceDown is silent ------
+  - interval: 1m
+    input_series:
+      # the pods (and their `up` series) are gone after minute 2
+      - series: 'up{job="monitoring/idp-services", namespace="shop", service="shop", pod="shop-1"}'
+        values: '1 1 _x10'
+      - series: 'kube_deployment_status_replicas_available{namespace="shop", deployment="shop", service="kps-kube-state-metrics"}'
+        values: '2 2 0x10'
+      - series: 'kube_deployment_status_replicas_available{namespace="other", deployment="other", service="kps-kube-state-metrics"}'
+        values: '2x12'
+      - series: 'kube_deployment_status_replicas_available{namespace="monitoring", deployment="alloy", service="kps-kube-state-metrics"}'
+        values: '0x12'            # platform namespaces are excluded
+    alert_rule_test:
+      - {eval_time: 10m, alertname: ServiceDown, exp_alerts: []}       # the gap this rule closes
+      - {eval_time: 3m, alertname: NoPodsAvailable, exp_alerts: []}    # not yet for 2 minutes
+      - eval_time: 5m
+        alertname: NoPodsAvailable
+        exp_alerts:
+          - exp_labels: {severity: critical, namespace: shop, deployment: shop}
+            exp_annotations:
+              summary: "shop/shop has no available pods"
+              description: "Deployment shop in shop has had zero ready pods for 2 minutes. kubectl -n shop get pods"
