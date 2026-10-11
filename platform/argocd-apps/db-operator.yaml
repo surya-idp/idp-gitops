@@ -30,6 +30,13 @@ spec:
           fullnameOverride: db-operator
           # Created by the ExternalSecret in platform/db-operator (second source).
           existingSecret: db-operator-credentials
+          # The namespace enforces the `restricted` pod security level (below). The chart sets
+          # runAsNonRoot and drops capabilities but not the seccomp profile that level also
+          # requires; without it Kubernetes refuses to create the pod (session A, 2026-10-11).
+          podSecurityContext:
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
           # One small Go controller; upstream sets no requests at all.
           resources:
             requests:

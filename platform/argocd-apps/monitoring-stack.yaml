@@ -21,6 +21,10 @@ metadata:
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "0"
+    # Compare with what the API server would store, not with the raw manifest. Without this
+    # the app is permanently "OutOfSync" on fields the cluster fills in by default (CRD and
+    # monitor defaults), and self-heal keeps re-applying an identical manifest.
+    argocd.argoproj.io/compare-options: ServerSideDiff=true
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
