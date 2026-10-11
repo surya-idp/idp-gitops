@@ -85,7 +85,17 @@ spec:
                 group_wait: 10s
                 group_interval: 1m
                 repeat_interval: 1h
+                # Written out in full: Helm merges this map over the chart's default config, and
+                # the default has a route to a receiver named "null". A receiver list of our own
+                # replaces the default list, so that route pointed at nothing and the operator
+                # refused the whole configuration (Alertmanager never started, 2026-10-11).
+                routes:
+                  # Watchdog fires all the time by design (it proves the alert path is alive).
+                  - receiver: "null"
+                    matchers:
+                      - alertname = "Watchdog"
               receivers:
+                - name: "null"
                 # A webhook receiver inside the cluster that writes each alert to its log
                 # (platform/monitoring/alert-receiver.yaml). The delivery path is the real one;
                 # only the destination is local, so no chat token has to be stored.

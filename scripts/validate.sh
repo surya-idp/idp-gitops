@@ -33,6 +33,8 @@ while read -r release namespace repo chart version values; do
         --namespace "$namespace" --include-crds --values "$values" > "$rendered"; then fail=1; continue; fi
   ./scripts/crd-schemas.py "$LOCAL_SCHEMAS" < "$rendered"
   "${KC[@]}" - < "$rendered" || fail=1
+  # An Alertmanager configuration that the operator would refuse (a route to a missing receiver).
+  ./scripts/alertmanager-check.py < "$rendered" || fail=1
 done < <(./scripts/helm-sources.py platform/argocd-apps)
 # Deployable roots: overlays and standalone kustomizations (bases are covered via overlays).
 # tests/ holds a sample golden-path service, so a change to components/ is always exercised.
