@@ -1,0 +1,3 @@
+# Python caches made when the scripts run
+__pycache__/
+*.pyc
