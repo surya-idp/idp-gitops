@@ -7,6 +7,15 @@ metadata:
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "1"
+    # Argo CD Image Updater (platform/image-updater, ImageUpdater `platform-apps`): the newest
+    # image in ECR whose tag is a commit SHA is committed to this app's kustomization.yaml by
+    # idp-ci-bot. CI of the app repo only pushes the image; it scans it before pushing.
+    argocd-image-updater.argoproj.io/image-list: 'app=693906847772.dkr.ecr.ap-south-1.amazonaws.com/idp-portal'
+    argocd-image-updater.argoproj.io/app.update-strategy: newest-build
+    argocd-image-updater.argoproj.io/app.allow-tags: 'regexp:^[0-9a-f]{40}$'
+    argocd-image-updater.argoproj.io/write-back-method: git:secret:argocd/image-updater-git
+    argocd-image-updater.argoproj.io/write-back-target: kustomization
+    argocd-image-updater.argoproj.io/git-branch: main
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:

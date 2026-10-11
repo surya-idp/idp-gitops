@@ -1,4 +1,4 @@
-# idp-portal in the dev cluster. CI (idp-portal repo) rewrites newTag on every push to main.
+# idp-portal in the dev cluster. Argo CD Image Updater rewrites newTag when a newer image appears in ECR.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: backstage

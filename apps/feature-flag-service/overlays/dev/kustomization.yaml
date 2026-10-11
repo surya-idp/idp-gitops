@@ -1,5 +1,5 @@
 # dev: the only environment deployed today. Automated sync (any merge to main deploys).
-# CI rewrites newTag below on every push to feature-flag-service main; the images
+# Argo CD Image Updater rewrites newTag below when a newer image appears in ECR; the images
 # entry covers both the Deployment and the migration Job (same image name).
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
