@@ -2,9 +2,12 @@
 # Kubernetes + CRD schemas, whether a human, a CI bot or Backstage wrote it (PLATFORM_REVIEW F2).
 name: validate
 
+# A pull request is checked by the pull_request run. Pushes are checked only on main, which is
+# where commits arrive without a pull request (the CI bot's image tags). Checking every branch
+# push as well ran the same validation twice for each pull request.
 on:
   push:
-    branches: ["**"]
+    branches: [main]
   pull_request:
 
 concurrency:
