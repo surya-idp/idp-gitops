@@ -47,9 +47,14 @@ spec:
         keyless:
           identities:
             - issuer: https://token.actions.githubusercontent.com
-              # main, or a release tag of the shared workflow. Not a branch: anyone who can
-              # push a branch to idp-platform could otherwise sign with a modified workflow.
-              subjectRegExp: '^https://github\.com/surya-idp/idp-platform/\.github/workflows/python-service\.yml@refs/(heads/main|tags/v.*)$'
+              # The certificate names the workflow by the ref its caller used. Services pin
+              # the workflow by commit (templates/python-service: `@<sha> # v2.0.0`), so the
+              # name ends in that commit, not in a tag (seen on the cluster, 2026-10-11).
+              # Accepted: main, a release tag, or the commit of a release listed here.
+              # Not "any commit": a commit on an unreviewed branch would then sign too.
+              # On every idp-platform release, add its commit to this list.
+              #   291df7b9774aca418fe913830c018e35089739ac = v2.0.0
+              subjectRegExp: '^https://github\.com/surya-idp/idp-platform/\.github/workflows/python-service\.yml@(refs/heads/main|refs/tags/v.*|291df7b9774aca418fe913830c018e35089739ac)$'
         ctlog:
           url: https://rekor.sigstore.dev
   attestations:
