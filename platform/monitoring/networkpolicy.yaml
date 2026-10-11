@@ -1,0 +1,37 @@
+# Who may connect to the monitoring data stores (found open in session A, 2026-10-11: any pod
+# in the cluster could reach Grafana and Prometheus).
+#
+# Selected pods: Grafana, Prometheus, Alertmanager, Loki and the alert receiver. They hold or
+# show everything the platform knows about every service, and Prometheus, Alertmanager and
+# Loki have no login of their own. After this, only pods of this namespace can connect to
+# them, plus Backstage to Grafana (dashboards linked from a service's page).
+#
+# People are not affected: `kubectl port-forward` reaches a pod through its node, which a
+# NetworkPolicy does not filter.
+#
+# Deliberately NOT selected:
+#   - Tempo: every service sends its traces there (port 4318), from every namespace.
+#   - the Prometheus operator: the Kubernetes API server calls its admission webhook, and
+#     with the VPC CNI the API server's address is in the same subnets as the pods, so it
+#     cannot be told apart by address.
+#   - node-exporter and kube-state-metrics: metrics only, scraped by Prometheus.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: monitoring-data-stores
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values: [grafana, prometheus, alertmanager, loki, alert-receiver]
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: {}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: backstage
+      ports:
+        - port: 3000          # Grafana's container port

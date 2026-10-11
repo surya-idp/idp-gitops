@@ -14,6 +14,7 @@ resources:
   - podmonitor.yaml
   - rules.yaml
   - alert-receiver.yaml
+  - networkpolicy.yaml
 configMapGenerator:
   - name: dashboard-service-overview
     files:
