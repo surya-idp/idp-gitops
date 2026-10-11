@@ -22,6 +22,11 @@ spec:
     - git:
         repoURL: https://github.com/surya-idp/idp-gitops
         revision: HEAD
+        # How often this generator looks for new or removed service folders. The default is
+        # 3 minutes, and a newly created service waited about 2.5 of its 5 minutes for it
+        # (session B, 2026-10-11). Argo CD's own 60 s poll (idp-infra 40-platform) covers
+        # changes to existing Applications, not the creation of new ones.
+        requeueAfterSeconds: 60
         directories:
           - path: apps/*/overlays/dev
           # These two predate the golden path and keep their own Application files
