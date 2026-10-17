@@ -113,8 +113,9 @@ spec:
               userKey: admin-user
               passwordKey: admin-password
             resources:
-              requests: {cpu: 20m, memory: 100Mi}
-              limits: {memory: 256Mi}
+              requests: {cpu: 20m, memory: 200Mi}
+              # 256Mi was OOMKilled when the IDP / Service overview dashboard was opened (2026-10-17).
+              limits: {memory: 512Mi}
             additionalDataSources:
               - name: Loki
                 type: loki
