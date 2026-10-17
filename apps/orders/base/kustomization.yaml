@@ -1,0 +1,28 @@
+# orders - created by the idp python-service golden path.
+#
+# The files here hold only what is specific to this service. The platform's standard settings
+# (rollout, pod security, probes, spreading, autoscaling metric) come from the components
+# below and are maintained centrally in components/.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - serviceaccount.yaml
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml
+  - hpa.yaml
+  - pdb.yaml
+components:
+  - ../../../components/golden-path
+  - ../../../components/public-route
+  # Own database and login; DATABASE_URL and DATABASE_* arrive as environment variables.
+  - ../../../components/postgres
+labels:
+  # On every resource, pod template and selector.
+  - pairs:
+      app.kubernetes.io/name: orders
+    includeSelectors: true
+  # How Backstage finds this service's pods (catalog annotation backstage.io/kubernetes-id).
+  - pairs:
+      backstage.io/kubernetes-id: orders
+    includeTemplates: true
