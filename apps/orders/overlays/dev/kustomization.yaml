@@ -7,5 +7,4 @@ resources:
   - ../../base
 images:
   - name: 693906847772.dkr.ecr.ap-south-1.amazonaws.com/svc/orders
-    # Quoted: a commit SHA made only of digits would otherwise be read as a number.
-    newTag: "52f4aff86a5538f1589329f117e61e5b74558da4"
+    newTag: bed7d11d636764c08be3b69124a6b1e754e747bf
